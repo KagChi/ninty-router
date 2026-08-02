@@ -805,6 +805,26 @@ pub fn models_fetcher(provider_id: &str) -> Option<(&'static str, ModelsFilter)>
     }
 }
 
+/// Quota/usage capability flags (9router registry `features.usage` / `usageApikey`).
+/// Eligible = (oauth && usage) || (apikey && usage_apikey).
+pub fn features(provider_id: &str) -> (bool, bool) {
+    match provider_id {
+        // oauth-only quota
+        "claude" | "codex" | "github" | "qoder" => (true, false),
+        // oauth + apikey quota
+        "codebuddy-cn" | "codebuddy-intl" | "kimi" => (true, true),
+        // apikey-only quota
+        "deepseek" | "glm" | "glm-cn" | "minimax" | "minimax-cn" => (false, true),
+        _ => (false, false),
+    }
+}
+
+/// Provider has any quota support (for UI filtering).
+pub fn usage_supported(provider_id: &str) -> bool {
+    let f = features(provider_id);
+    f.0 || f.1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
