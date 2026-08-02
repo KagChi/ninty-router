@@ -2,7 +2,7 @@ import { For, Show, createResource, createSignal } from "solid-js";
 import { A, useParams } from "@solidjs/router";
 import { api } from "~/lib/api";
 import { Badge, Button, Card, CardSection, Icon, Input, Modal, cn } from "~/components/ui";
-import { ProviderIcon, type Connection, type Provider } from "~/routes/providers";
+import { ProviderIcon, type Connection, type Provider } from "~/components/provider-bits";
 
 export default function ProviderDetail() {
   const params = useParams();
