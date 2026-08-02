@@ -53,6 +53,28 @@ export default function SettingsPage() {
   const [pxpipe, { refetch: refetchPxpipe }] = createResource(async () =>
     api<PxpipeStatus>("/pxpipe/status")
   );
+
+  // Change Password (9router profile page 1:1)
+  const [pw, setPw] = createSignal({ current: "", next: "", confirm: "" });
+  const [pwMsg, setPwMsg] = createSignal<{ type: "success" | "error"; text: string } | null>(null);
+  const changePassword = async (e: Event) => {
+    e.preventDefault();
+    setPwMsg(null);
+    if (pw().next !== pw().confirm) {
+      setPwMsg({ type: "error", text: "Passwords do not match" });
+      return;
+    }
+    try {
+      await api("/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ currentPassword: pw().current, newPassword: pw().next }),
+      });
+      setPwMsg({ type: "success", text: "Password updated successfully" });
+      setPw({ current: "", next: "", confirm: "" });
+    } catch (err) {
+      setPwMsg({ type: "error", text: err instanceof Error ? err.message : "Failed to update password" });
+    }
+  };
   const installPxpipe = async () => {
     await api("/pxpipe/install", { method: "POST" });
     // install runs server-side in background; poll status
@@ -196,6 +218,57 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
+            </Card>
+
+            {/* Change Password (9router profile page 1:1) */}
+            <Card title="Change Password" icon="lock">
+              <form onSubmit={changePassword} class="flex flex-col gap-3">
+                <label class="text-xs font-medium text-text-muted">
+                  Current password
+                  <div class="mt-1">
+                    <Input
+                      type="password"
+                      value={pw().current}
+                      onInput={(v) => setPw({ ...pw(), current: v })}
+                    />
+                  </div>
+                </label>
+                <label class="text-xs font-medium text-text-muted">
+                  New password
+                  <div class="mt-1">
+                    <Input
+                      type="password"
+                      value={pw().next}
+                      onInput={(v) => setPw({ ...pw(), next: v })}
+                    />
+                  </div>
+                </label>
+                <label class="text-xs font-medium text-text-muted">
+                  Confirm new password
+                  <div class="mt-1">
+                    <Input
+                      type="password"
+                      value={pw().confirm}
+                      onInput={(v) => setPw({ ...pw(), confirm: v })}
+                    />
+                  </div>
+                </label>
+                <div class="flex items-center gap-3">
+                  <Button type="submit" size="sm">
+                    Update password
+                  </Button>
+                  <Show when={pwMsg()}>
+                    <span
+                      class={`flex items-center gap-1.5 text-sm ${
+                        pwMsg()!.type === "success" ? "text-green-500" : "text-danger"
+                      }`}
+                    >
+                      <Icon name={pwMsg()!.type === "success" ? "check_circle" : "error"} class="text-[16px]" />
+                      {pwMsg()!.text}
+                    </span>
+                  </Show>
+                </div>
+              </form>
             </Card>
 
             <Card title="Import from 9router" icon="upload">

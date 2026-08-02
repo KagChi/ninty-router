@@ -32,7 +32,14 @@ async fn request_logs(
 ) -> Result<Json<Value>, ApiError> {
     super::require_session(&state, &headers).await?;
     let limit: i64 = q.get("limit").and_then(|v| v.parse().ok()).unwrap_or(200);
-    let rows = crate::repos::usage::list_request_details(&state.db, limit).await?;
+    let rows = crate::repos::usage::list_request_details_filtered(
+        &state.db,
+        limit,
+        q.get("provider").cloned(),
+        q.get("startDate").cloned(),
+        q.get("endDate").cloned(),
+    )
+    .await?;
     Ok(Json(serde_json::json!({ "logs": rows })))
 }
 

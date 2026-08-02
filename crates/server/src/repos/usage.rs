@@ -148,15 +148,43 @@ pub struct RequestDetailRow {
 }
 
 pub async fn list_request_details(db: &Db, limit: i64) -> Result<Vec<RequestDetailRow>> {
+    list_request_details_filtered(db, limit, None, None, None).await
+}
+
+/// 9router request-logs filters 1:1: provider, startDate, endDate (ISO dates).
+pub async fn list_request_details_filtered(
+    db: &Db,
+    limit: i64,
+    provider: Option<String>,
+    start_date: Option<String>,
+    end_date: Option<String>,
+) -> Result<Vec<RequestDetailRow>> {
     db.call(move |conn| {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, ts, provider, model, status, data FROM request_details
-                 ORDER BY id DESC LIMIT ?1",
-            )
-            .map_err(|e| Error::Db(e.to_string()))?;
+        let mut sql = "SELECT id, ts, provider, model, status, data FROM request_details".to_string();
+        let mut clauses: Vec<String> = Vec::new();
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        if let Some(p) = provider.filter(|p| !p.is_empty()) {
+            params.push(Box::new(p));
+            clauses.push(format!("provider = ?{}", params.len()));
+        }
+        if let Some(s) = start_date.filter(|s| !s.is_empty()) {
+            params.push(Box::new(s));
+            clauses.push(format!("ts >= ?{}", params.len()));
+        }
+        if let Some(e) = end_date.filter(|e| !e.is_empty()) {
+            params.push(Box::new(format!("{e}T23:59:59")));
+            clauses.push(format!("ts <= ?{}", params.len()));
+        }
+        if !clauses.is_empty() {
+            sql.push_str(" WHERE ");
+            sql.push_str(&clauses.join(" AND "));
+        }
+        params.push(Box::new(limit.clamp(1, 1000)));
+        sql.push_str(&format!(" ORDER BY id DESC LIMIT ?{}", params.len()));
+        let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let mut stmt = conn.prepare(&sql).map_err(|e| Error::Db(e.to_string()))?;
         let rows = stmt
-            .query_map([limit.clamp(1, 1000)], |r| {
+            .query_map(param_refs.as_slice(), |r| {
                 let data: String = r.get(5)?;
                 Ok(RequestDetailRow {
                     id: r.get(0)?,

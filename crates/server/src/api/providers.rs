@@ -22,6 +22,7 @@ pub fn router() -> Router<Arc<AppState>> {
             axum::routing::put(update_connection).delete(delete_connection),
         )
         .route("/{id}/test", post(test_connection))
+        .route("/test-batch", post(test_batch))
         .route("/export/{provider}", get(export_connections))
         .route("/import/{provider}", post(import_connections))
         .route("/nodes", get(list_nodes).post(create_node))
@@ -267,6 +268,44 @@ async fn import_connections(
 }
 
 
+/// Test one connection: ensure_fresh → probe → 401/403 refresh-retry → store
+/// testStatus/lastError. Returns (ProbeResult, latency_ms). Shared by
+/// test_connection and test_batch.
+async fn test_conn(state: &Arc<AppState>, conn: &Connection) -> (ProbeResult, u64) {
+    let conn = crate::oauth_state::ensure_fresh(state, conn)
+        .await
+        .unwrap_or_else(|_| conn.clone());
+
+    let started = std::time::Instant::now();
+    let mut result = probe(state, &conn).await;
+
+    // 401/403 + refreshToken → refresh once, retry probe once.
+    if matches!(result.status, Some(401) | Some(403))
+        && conn.data.get("refreshToken").and_then(|v| v.as_str()).is_some()
+    {
+        if let Ok(fresh) = crate::oauth_state::refresh_now(state, &conn).await {
+            result = probe(state, &fresh).await;
+        }
+    }
+    let latency = started.elapsed().as_millis() as u64;
+
+    let _ = connections::update(
+        &state.db,
+        &conn.id,
+        ConnectionPatch {
+            data: Some(json!({
+                "testStatus": if result.ok { "active" } else { "error" },
+                "lastError": if result.ok { serde_json::Value::Null } else { json!(result.message) },
+                "lastErrorAt": chrono::Utc::now().to_rfc3339(),
+            })),
+            ..Default::default()
+        },
+    )
+    .await;
+
+    (result, latency)
+}
+
 /// Test: per-provider probe matrix (9router testUtils.js 1:1). Stores
 /// testStatus "active"/"error" + lastError in connection data.
 async fn test_connection(
@@ -278,40 +317,79 @@ async fn test_connection(
     let conn = connections::get(&state.db, &id)
         .await?
         .ok_or_else(|| ninty_core::error::Error::NotFound("connection".into()))?;
-    // Proactive refresh for oauth connections near expiry (9router refreshes before probe).
-    let conn = crate::oauth_state::ensure_fresh(&state, &conn)
-        .await
-        .unwrap_or(conn);
-
-    let mut result = probe(&state, &conn).await;
-
-    // 401/403 + refreshToken → refresh once, retry probe once.
-    if matches!(result.status, Some(401) | Some(403))
-        && conn.data.get("refreshToken").and_then(|v| v.as_str()).is_some()
-    {
-        if let Ok(fresh) = crate::oauth_state::refresh_now(&state, &conn).await {
-            result = probe(&state, &fresh).await;
-        }
-    }
-
-    connections::update(
-        &state.db,
-        &id,
-        ConnectionPatch {
-            data: Some(json!({
-                "testStatus": if result.ok { "active" } else { "error" },
-                "lastError": if result.ok { serde_json::Value::Null } else { json!(result.message) },
-                "lastErrorAt": chrono::Utc::now().to_rfc3339(),
-            })),
-            ..Default::default()
-        },
-    )
-    .await?;
+    let (result, _latency) = test_conn(&state, &conn).await;
 
     Ok(Json(json!({
         "ok": result.ok,
         "status": result.status,
         "message": result.message,
+    })))
+}
+
+/// POST /api/providers/test-batch {mode, providerId?} — 9router 1:1.
+/// mode: provider | oauth | free | apikey | all. Sequential probes; returns
+/// per-conn results + summary {total, passed, failed}.
+async fn test_batch(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_session(&state, &headers).await?;
+    let mode = body
+        .get("mode")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| ninty_core::error::Error::BadRequest("mode is required".into()))?;
+    let provider_id = body.get("providerId").and_then(|v| v.as_str());
+
+    let all = connections::list(&state.db, None).await?;
+    let group = |c: &Connection| -> &str {
+        if c.auth_type == "oauth" {
+            return "oauth";
+        }
+        match registry::find_provider(&c.provider) {
+            Some(p) if p.no_auth => "free",
+            Some(p) if p.category == registry::Category::OAuth => "oauth",
+            _ => "apikey",
+        }
+    };
+    let to_test: Vec<&Connection> = match mode {
+        "provider" => all
+            .iter()
+            .filter(|c| Some(c.provider.as_str()) == provider_id)
+            .collect(),
+        "oauth" | "free" | "apikey" => all.iter().filter(|c| group(c) == mode).collect(),
+        "all" => all.iter().collect(),
+        _ => {
+            return Err(ninty_core::error::Error::BadRequest(
+                "Invalid mode. Use: provider, oauth, free, apikey, all".into(),
+            )
+            .into())
+        }
+    };
+
+    let mut results = Vec::with_capacity(to_test.len());
+    for conn in to_test {
+        let (r, latency) = test_conn(&state, conn).await;
+        results.push(json!({
+            "provider": conn.provider,
+            "connectionId": conn.id,
+            "connectionName": conn.name.clone()
+                .or_else(|| conn.data.get("email").and_then(|v| v.as_str()).map(String::from))
+                .unwrap_or_else(|| conn.provider.clone()),
+            "authType": group(conn),
+            "valid": r.ok,
+            "latencyMs": latency,
+            "error": if r.ok { serde_json::Value::Null } else { json!(r.message) },
+            "statusCode": r.status,
+        }));
+    }
+    let passed = results.iter().filter(|r| r["valid"].as_bool().unwrap_or(false)).count();
+    Ok(Json(json!({
+        "mode": mode,
+        "providerId": provider_id,
+        "results": results,
+        "testedAt": chrono::Utc::now().to_rfc3339(),
+        "summary": { "total": results.len(), "passed": passed, "failed": results.len() - passed },
     })))
 }
 

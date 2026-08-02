@@ -6,6 +6,8 @@ import "./app.css";
 import { api, type AuthStatus } from "~/lib/api";
 import { Skeleton, Icon } from "~/components/ui";
 import Sidebar from "~/components/Sidebar";
+import { Toasts } from "~/lib/toast";
+import Header from "~/components/Header";
 
 function Shell(props: { children: unknown }) {
   const location = useLocation();
@@ -47,6 +49,7 @@ function Shell(props: { children: unknown }) {
           }
           return (
             <div class="flex h-screen w-full overflow-hidden bg-bg">
+              <Toasts />
               {/* Desktop sidebar */}
               <div class="hidden lg:flex">
                 <Sidebar />
@@ -68,6 +71,10 @@ function Shell(props: { children: unknown }) {
               </div>
 
               <main class="flex-1 overflow-y-auto">
+                {/* Desktop header (9router Header.js 1:1) */}
+                <div class="sticky top-0 z-20 hidden bg-bg/80 backdrop-blur-xl lg:block">
+                  <Header />
+                </div>
                 {/* Mobile top bar */}
                 <div class="flex items-center gap-3 border-b border-border-subtle px-4 py-3 lg:hidden">
                   <button

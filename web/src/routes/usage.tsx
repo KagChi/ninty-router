@@ -1,6 +1,6 @@
 import { For, Show, createResource, createSignal } from "solid-js";
 import { api } from "~/lib/api";
-import { Badge, Button, Card, PageHeader, SegmentedControl, CardSkeleton } from "~/components/ui";
+import { Badge, Button, Card, PageHeader, SegmentedControl, Select, CardSkeleton } from "~/components/ui";
 
 interface Stats {
   total: { requests: number; input: number; output: number };
@@ -58,7 +58,15 @@ export default function UsagePage() {
   const [providers] = createResource(async () =>
     api<{ providers: ProviderRow[] }>("/usage/providers")
   );
-  const [logs] = createResource(async () => api<{ logs: LogRow[] }>("/usage/request-logs"));
+  const [logsFilter, setLogsFilter] = createSignal({ provider: "", startDate: "", endDate: "" });
+  const [logs] = createResource(logsFilter, async (f) => {
+    const params = new URLSearchParams();
+    if (f.provider) params.set("provider", f.provider);
+    if (f.startDate) params.set("startDate", f.startDate);
+    if (f.endDate) params.set("endDate", f.endDate);
+    const qs = params.toString();
+    return api<{ logs: LogRow[] }>(`/usage/request-logs${qs ? `?${qs}` : ""}`);
+  });
   const [open, setOpen] = createSignal<number | null>(null);
 
   const exportCsv = () => {
@@ -217,6 +225,53 @@ export default function UsagePage() {
       </Show>
 
       <Show when={tab() === "logs"}>
+        {/* filters (9router RequestDetailsTab: provider + start/end date) */}
+        <div class="mb-3 flex flex-wrap items-end gap-3">
+          <label class="text-xs font-medium text-text-muted">
+            Provider
+            <div class="mt-1">
+              <Select
+                value={logsFilter().provider}
+                onChange={(v) => setLogsFilter({ ...logsFilter(), provider: v })}
+              >
+                <option value="">All providers</option>
+                <For each={providers()?.providers ?? []}>
+                  {(p) => <option value={p.provider}>{p.provider}</option>}
+                </For>
+              </Select>
+            </div>
+          </label>
+          <label class="text-xs font-medium text-text-muted">
+            Start Date
+            <div class="mt-1">
+              <input
+                type="date"
+                class="h-9 rounded-[10px] border border-border bg-bg px-3 text-sm text-text-main focus:border-brand-500/50 focus:outline-none"
+                value={logsFilter().startDate}
+                onChange={(e) => setLogsFilter({ ...logsFilter(), startDate: e.currentTarget.value })}
+              />
+            </div>
+          </label>
+          <label class="text-xs font-medium text-text-muted">
+            End Date
+            <div class="mt-1">
+              <input
+                type="date"
+                class="h-9 rounded-[10px] border border-border bg-bg px-3 text-sm text-text-main focus:border-brand-500/50 focus:outline-none"
+                value={logsFilter().endDate}
+                onChange={(e) => setLogsFilter({ ...logsFilter(), endDate: e.currentTarget.value })}
+              />
+            </div>
+          </label>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLogsFilter({ provider: "", startDate: "", endDate: "" })}
+          >
+            Clear
+          </Button>
+        </div>
+
         <Show
           when={(logs()?.logs.length ?? 0) > 0}
           fallback={

@@ -163,3 +163,7 @@ live e2e against running server where credentials/mocks allow.
 - 2026-08-02: **P3d DONE** (5d5d3c0) — deprecated flag + RISK_NOTICE banner
   (claude/codex/github), Add Anthropic/OpenAI Compatible buttons + apiType badge.
   Skipped: compatible-node detail page (nodes managed inline on index).
+- 2026-08-02: **P4 DONE** (909c3f8) — endpoint page 1:1: Model Aliases card,
+  key rows w/ progress bars (used via key_usage_since), pause/resume, reset,
+  create/edit modals (limit/window/RPM/allowed-models picker), Created dialog.
+  Chat enforcement already present (401 paused, 429 limit, allowed_models).

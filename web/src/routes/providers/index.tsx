@@ -14,6 +14,11 @@ export default function Providers() {
   const [nodeForm, setNodeForm] = createSignal({ prefix: "", base_url: "", api_key: "", name: "", api_type: "openai" });
   const [error, setError] = createSignal("");
   const [testing, setTesting] = createSignal<string | null>(null);
+  const [testResults, setTestResults] = createSignal<{
+    results: { provider: string; connectionName: string; valid: boolean; latencyMs: number; error: string | null }[];
+    summary: { total: number; passed: number; failed: number };
+  } | null>(null);
+  const [showAllApikey, setShowAllApikey] = createSignal(false);
 
   const match = (p: Provider) =>
     !search().trim() || p.display_name.toLowerCase().includes(search().trim().toLowerCase()) ||
@@ -37,6 +42,10 @@ export default function Providers() {
         return ca - cb || a.display_name.localeCompare(b.display_name);
       });
 
+  /** 9router: API Key section shows first 20 unless searching / expanded. */
+  const visibleApikeyProviders = () =>
+    search().trim() || showAllApikey() ? apiKeyProviders() : apiKeyProviders().slice(0, 20);
+
   const toggleProvider = async (p: Provider, enable: boolean) => {
     await Promise.all(
       p.connections.map((c) =>
@@ -46,14 +55,17 @@ export default function Providers() {
     refetch();
   };
 
-  const testAll = async (group: string, providers: Provider[]) => {
+  const testAll = async (group: string) => {
     setTesting(group);
+    setTestResults(null);
     try {
-      await Promise.all(
-        providers.flatMap((p) =>
-          p.connections.map((c) => api(`/providers/${c.id}/test`, { method: "POST" }).catch(() => {}))
-        )
-      );
+      const data = await api<{
+        results: { provider: string; connectionName: string; valid: boolean; latencyMs: number; error: string | null }[];
+        summary: { total: number; passed: number; failed: number };
+      }>("/providers/test-batch", { method: "POST", body: JSON.stringify({ mode: group }) });
+      setTestResults(data);
+    } catch {
+      setTestResults({ results: [], summary: { total: 0, passed: 0, failed: 0 } });
     } finally {
       setTesting(null);
       refetch();
@@ -81,9 +93,9 @@ export default function Providers() {
     }
   };
 
-  const TestAllBtn = (props: { group: string; providers: Provider[] }) => (
+  const TestAllBtn = (props: { group: string }) => (
     <button
-      onClick={() => testAll(props.group, props.providers)}
+      onClick={() => testAll(props.group)}
       disabled={testing() !== null}
       class={cn(
         "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
@@ -194,7 +206,7 @@ export default function Providers() {
       <Show when={byCategory("oauth").length > 0}>
         <div class="flex flex-col gap-4">
           <SectionHeader title="OAuth Providers">
-            <TestAllBtn group="oauth" providers={byCategory("oauth")} />
+            <TestAllBtn group="oauth" />
           </SectionHeader>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             <For each={byCategory("oauth")}>
@@ -208,7 +220,7 @@ export default function Providers() {
       <Show when={(data()?.providers ?? []).filter((p) => p.no_auth && match(p)).length > 0}>
         <div class="flex flex-col gap-4">
           <SectionHeader title="Free Tier Providers">
-            <TestAllBtn group="free" providers={(data()?.providers ?? []).filter((p) => p.no_auth && match(p))} />
+            <TestAllBtn group="free" />
           </SectionHeader>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             <For each={(data()?.providers ?? []).filter((p) => p.no_auth && match(p))}>
@@ -222,13 +234,22 @@ export default function Providers() {
       <Show when={apiKeyProviders().length > 0}>
         <div class="flex flex-col gap-4">
           <SectionHeader title="API Key Providers">
-            <TestAllBtn group="apikey" providers={apiKeyProviders()} />
+            <TestAllBtn group="apikey" />
           </SectionHeader>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-            <For each={apiKeyProviders()}>
+            <For each={visibleApikeyProviders()}>
               {(p) => <ProviderCard p={p} onToggle={(enable) => toggleProvider(p, enable)} />}
             </For>
           </div>
+          <Show when={!search().trim() && !showAllApikey() && apiKeyProviders().length > 20}>
+            <button
+              onClick={() => setShowAllApikey(true)}
+              class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-brand-500/40 px-3 py-2.5 text-sm font-medium text-brand-500 transition-colors hover:border-brand-500 hover:bg-brand-500/5"
+            >
+              <Icon name="expand_more" class="text-[16px]" />
+              Show all {apiKeyProviders().length} providers
+            </button>
+          </Show>
         </div>
       </Show>
 
@@ -290,6 +311,39 @@ export default function Providers() {
             </div>
           </label>
         </div>
+      </Modal>
+
+      {/* Test All results modal (9router ProviderTestResultsView) */}
+      <Modal
+        open={testResults() !== null}
+        title={`Test Results — ${testResults()?.summary.passed ?? 0}/${testResults()?.summary.total ?? 0} passed`}
+        onClose={() => setTestResults(null)}
+      >
+        <Show
+          when={(testResults()?.results.length ?? 0) > 0}
+          fallback={<p class="py-4 text-center text-sm text-text-muted">No connections tested.</p>}
+        >
+          <div class="flex flex-col gap-1.5">
+            <For each={testResults()!.results}>
+              {(r) => (
+                <div class="flex items-center gap-3 rounded-[10px] border border-border-subtle px-3 py-2">
+                  <Icon
+                    name={r.valid ? "check_circle" : "cancel"}
+                    class={`text-[16px] ${r.valid ? "text-green-500" : "text-red-500"}`}
+                  />
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-medium">{r.connectionName}</p>
+                    <p class="truncate font-mono text-[11px] text-text-muted">
+                      {r.provider}
+                      <Show when={r.error}> · <span class="text-red-500">{r.error}</span></Show>
+                    </p>
+                  </div>
+                  <span class="text-xs text-text-subtle">{r.latencyMs}ms</span>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
       </Modal>
     </div>
   );

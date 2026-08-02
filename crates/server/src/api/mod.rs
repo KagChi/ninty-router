@@ -24,6 +24,7 @@ use ninty_core::error::Error;
 pub fn router(state: Arc<AppState>) -> Router {
     let api = Router::new()
         .route("/health", get(health))
+        .route("/version/shutdown", axum::routing::post(shutdown))
         .nest("/auth", auth_routes::router())
         .nest("/settings", settings_routes::router())
         .nest("/combos", combos::router())
@@ -48,6 +49,19 @@ pub fn router(state: Arc<AppState>) -> Router {
 
 async fn health() -> Json<serde_json::Value> {
     Json(json!({"status": "ok", "service": "ninty-router"}))
+}
+
+/// POST /api/version/shutdown (9router 1:1) — graceful exit after response.
+async fn shutdown(
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_session(&state, &headers).await?;
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        std::process::exit(0);
+    });
+    Ok(Json(json!({"ok": true, "message": "shutting down"})))
 }
 
 /// Guard for protected routes: passes when login not required or session cookie valid.

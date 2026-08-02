@@ -314,7 +314,8 @@ export function PageHeader(props: {
 }) {
   return (
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <div>
+      {/* Title/subtitle hidden on desktop — sticky Header owns page title (9router 1:1) */}
+      <div class="lg:hidden">
         <h1 class="text-2xl font-semibold tracking-tight text-text-main">{props.title}</h1>
         <Show when={props.subtitle}>
           <p class="mt-0.5 text-sm text-text-muted">{props.subtitle}</p>
