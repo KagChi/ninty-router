@@ -349,3 +349,32 @@ export function Toggle(props: { checked: boolean; onChange: () => void; label?: 
     </button>
   );
 }
+
+// ---------- Skeletons (9router Loading.js 1:1) ----------
+
+export function Skeleton(props: { class?: string }) {
+  return <div class={cn("animate-pulse rounded-[10px] bg-surface-2", props.class)} />;
+}
+
+export function CardSkeleton() {
+  return (
+    <div class="rounded-[14px] border border-border-subtle bg-surface p-6 shadow-[var(--shadow-soft)]">
+      <div class="mb-4 flex items-center justify-between">
+        <Skeleton class="h-4 w-24" />
+        <Skeleton class="size-10 rounded-[10px]" />
+      </div>
+      <Skeleton class="mb-2 h-8 w-16" />
+      <Skeleton class="h-3 w-20" />
+    </div>
+  );
+}
+
+export function TableSkeleton(props: { rows?: number }) {
+  return (
+    <div class="flex flex-col gap-2">
+      {Array.from({ length: props.rows ?? 4 }, () => (
+        <Skeleton class="h-10 w-full" />
+      ))}
+    </div>
+  );
+}

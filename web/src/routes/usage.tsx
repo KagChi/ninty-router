@@ -1,6 +1,6 @@
 import { For, Show, createResource, createSignal } from "solid-js";
 import { api } from "~/lib/api";
-import { Badge, Button, Card, PageHeader, SegmentedControl } from "~/components/ui";
+import { Badge, Button, Card, PageHeader, SegmentedControl, CardSkeleton } from "~/components/ui";
 
 interface Stats {
   total: { requests: number; input: number; output: number };
@@ -103,7 +103,7 @@ export default function UsagePage() {
       </div>
 
       <Show when={tab() === "overview"}>
-        <Show when={stats()} fallback={<p class="text-sm text-text-muted">Loading…</p>}>
+        <Show when={stats()} fallback={<div class="grid grid-cols-2 gap-4 md:grid-cols-4"><CardSkeleton /><CardSkeleton /><CardSkeleton /><CardSkeleton /></div>}>
           {(s) => (
             <div class="space-y-6">
               <div class="grid grid-cols-2 gap-4 md:grid-cols-4">

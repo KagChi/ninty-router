@@ -1,6 +1,6 @@
 import { For, Show, createResource, createSignal, onCleanup, onMount } from "solid-js";
 import { api } from "~/lib/api";
-import { Badge, Button, Card, Icon, PageHeader } from "~/components/ui";
+import { Badge, Button, Card, Icon, PageHeader, CardSkeleton } from "~/components/ui";
 
 interface QuotaWindow {
   label: string;
@@ -59,7 +59,7 @@ export default function QuotaPage() {
         }
       />
 
-      <Show when={reports()} fallback={<p class="text-sm text-text-muted">Loading…</p>}>
+      <Show when={reports()} fallback={<div class="grid gap-4 md:grid-cols-2"><CardSkeleton /><CardSkeleton /></div>}>
         <Show
           when={reports()!.reports.length > 0}
           fallback={

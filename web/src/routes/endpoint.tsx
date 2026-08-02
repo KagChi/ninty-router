@@ -1,6 +1,6 @@
 import { For, Show, createResource, createSignal } from "solid-js";
 import { api, type ApiKey } from "~/lib/api";
-import { Button, Card, CardSection, Icon, Input, PageHeader } from "~/components/ui";
+import { Button, Card, CardSection, Icon, Input, PageHeader, TableSkeleton } from "~/components/ui";
 
 export default function Endpoint() {
   const [keys, { refetch }] = createResource(async () => {
@@ -115,7 +115,7 @@ export default function Endpoint() {
           </p>
         </Show>
 
-        <Show when={keys()} fallback={<p class="text-sm text-text-muted">loading…</p>}>
+        <Show when={keys()} fallback={<TableSkeleton rows={3} />}>
           <Show
             when={(keys()?.length ?? 0) > 0}
             fallback={

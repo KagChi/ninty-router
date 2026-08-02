@@ -4,6 +4,7 @@ import { Suspense, createResource, Show } from "solid-js";
 import { useLocation, useNavigate } from "@solidjs/router";
 import "./app.css";
 import { api, type AuthStatus } from "~/lib/api";
+import { Skeleton } from "~/components/ui";
 import Sidebar from "~/components/Sidebar";
 
 function Shell(props: { children: unknown }) {
@@ -20,7 +21,19 @@ function Shell(props: { children: unknown }) {
   const isLoginPage = () => location.pathname.startsWith("/login");
 
   return (
-    <Show when={!auth.loading} fallback={<div class="p-8 text-text-muted">loading…</div>}>
+    <Show
+      when={!auth.loading}
+      fallback={
+        <div class="flex h-screen w-full gap-6 overflow-hidden bg-bg p-6">
+          <Skeleton class="h-full w-72 shrink-0 rounded-[14px]" />
+          <div class="flex flex-1 flex-col gap-4">
+            <Skeleton class="h-8 w-48" />
+            <Skeleton class="h-40 w-full rounded-[14px]" />
+            <Skeleton class="h-40 w-full rounded-[14px]" />
+          </div>
+        </div>
+      }
+    >
       <Show
         when={!isLoginPage()}
         fallback={props.children}

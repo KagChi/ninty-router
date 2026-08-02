@@ -1,7 +1,7 @@
 import { For, Show, createResource, createSignal } from "solid-js";
 import { A, useParams } from "@solidjs/router";
 import { api } from "~/lib/api";
-import { Badge, Button, Card, CardSection, Icon, Input, Modal, cn } from "~/components/ui";
+import { Badge, Button, Card, CardSection, Icon, Input, Modal, cn, CardSkeleton } from "~/components/ui";
 import { ProviderIcon, type Connection, type Provider } from "~/components/provider-bits";
 
 export default function ProviderDetail() {
@@ -133,7 +133,20 @@ export default function ProviderDetail() {
 
   return (
     <div class="flex flex-col gap-6">
-      <Show when={data()} fallback={<p class="text-sm text-text-muted">loading…</p>}>
+      <Show
+        when={data() !== undefined}
+        fallback={<><CardSkeleton /><CardSkeleton /></>}
+      >
+        <Show
+          when={data()}
+          fallback={
+            <Card>
+              <p class="py-4 text-center text-sm text-text-muted">
+                Provider “{params.id}” not found.
+              </p>
+            </Card>
+          }
+        >
         {(p) => (
           <>
             <div class="flex items-center gap-4">
@@ -324,6 +337,7 @@ export default function ProviderDetail() {
             </Modal>
           </>
         )}
+        </Show>
       </Show>
     </div>
   );

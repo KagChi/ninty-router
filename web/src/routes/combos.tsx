@@ -1,6 +1,6 @@
 import { For, Show, createResource, createSignal } from "solid-js";
 import { api } from "~/lib/api";
-import { Badge, Button, Card, Icon, Input, PageHeader, Select, Textarea } from "~/components/ui";
+import { Badge, Button, Card, Icon, Input, PageHeader, Select, Textarea, CardSkeleton } from "~/components/ui";
 
 interface Combo {
   id: string;
@@ -109,7 +109,7 @@ export default function Combos() {
         </div>
       </Card>
 
-      <Show when={combos()} fallback={<p class="text-sm text-text-muted">Loading…</p>}>
+      <Show when={combos()} fallback={<><CardSkeleton /><CardSkeleton /></>}>
         <For each={combos()}>
           {(c) => (
             <Card padding="sm" class="mb-2 flex items-start justify-between">

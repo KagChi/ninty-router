@@ -1,6 +1,6 @@
 import { Show, createResource, createSignal } from "solid-js";
 import { api } from "~/lib/api";
-import { Button, Card, Icon, Input, PageHeader, Select, Toggle } from "~/components/ui";
+import { Button, Card, Icon, Input, PageHeader, Select, Toggle, CardSkeleton } from "~/components/ui";
 
 interface Settings {
   rtk_enabled: boolean;
@@ -67,7 +67,7 @@ export default function SettingsPage() {
   return (
     <div>
       <PageHeader title="Settings" subtitle="Token savers, gateway policy, data import" />
-      <Show when={settings()} fallback={<p class="text-sm text-text-muted">Loading…</p>}>
+      <Show when={settings()} fallback={<CardSkeleton />}>
         {(s) => (
           <div class="max-w-xl space-y-6">
             <Card title="Token Savers" icon="savings">
