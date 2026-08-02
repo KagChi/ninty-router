@@ -70,7 +70,10 @@ async fn test_model(
         registry::WireFormat::Openai => json!({
             "model": target.model,
             "messages": [{"role": "user", "content": "ping"}],
-            "max_tokens": 1, "stream": false,
+            "max_tokens": 1,
+            // force_stream providers (codebuddy-intl: 11101 on non-stream) —
+            // mirror the chat pipeline.
+            "stream": target.force_stream,
         }),
     };
     let mut req = state
