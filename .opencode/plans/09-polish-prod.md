@@ -1,5 +1,23 @@
 # 09 — PXPIPE, request logging, production build, docs
 
+Status: DONE (deviations). engine::pxpipe — pxpipe-proxy invoked via subprocess shim
+(bun/node, $DATA_DIR/pxpipe/shim.mjs) instead of in-process import; gates/summary/log
+format ported 1:1; live-verified (54k system slab → 2 images, 77.5% est saved, health
+checks green). /api/pxpipe/{status,install,health} + Token Saver UI (toggle, gates,
+install button w/ poll). Request logs: DetailCtx in chat pipeline — client body +
+post-savers provider body (64KB trunc), latency, pxpipe meta; ring buffer 1000;
+/api/usage/request-logs + Usage → Request Details tab. Analytics: /api/usage/
+{stats,history,providers} + Usage page (stat cards, 30d bar chart, by-provider/model,
+CSV export). Prod: web_static (rust-embed web/.output/public, SPA fallback, immutable
+assets) behind embed-web; cli feature forward; build.sh verified standalone from /tmp
+(dashboard, SPA, /v1, port-conflict). CLI: PORT/HOST env, port conflict detection,
+banner, SIGTERM WAL checkpoint. README with quickstart (verified paths), per-tool
+endpoint table, saver table, fallback explainer, cost-as-savings note. Deviations:
+(1) pxpipe is subprocess not in-process (Rust has no pxpipe renderer); Docker runtime
+has no node → pxpipe unavailable there, fail-open; (2) per-key/per-connection usage
+filters not implemented (aggregates only); (3) headroom proxy saver not ported
+(optional in reference too); (4) qoder path doesn't write request_details extras.
+
 ## Goal
 
 Remaining savers, observability, single-binary prod build, README.

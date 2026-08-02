@@ -47,9 +47,9 @@ async fn health(
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_session(&state, &headers).await?;
-    Ok(Json(
-        serde_json::to_value(engine::pxpipe::run_health_check(&config::data_dir()).await)?,
-    ))
+    Ok(Json(serde_json::to_value(
+        engine::pxpipe::run_health_check(&config::data_dir()).await,
+    )?))
 }
 
 async fn install(

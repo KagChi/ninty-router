@@ -6,14 +6,14 @@ RUN bun install --frozen-lockfile
 COPY web/ ./
 RUN bun run build
 
-# ---------- Stage 2: rust binary (embeds web/dist) ----------
+# ---------- Stage 2: rust binary (embeds web/.output/public) ----------
 FROM rust:1-slim-bookworm AS rust
 WORKDIR /build
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config \
     && rm -rf /var/lib/apt/lists/*
 COPY Cargo.toml Cargo.lock* ./
 COPY crates/ crates/
-COPY --from=web /build/web/.output/public web/dist
+COPY --from=web /build/web/.output/public web/.output/public
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
     cargo build --release -p cli --features embed-web \

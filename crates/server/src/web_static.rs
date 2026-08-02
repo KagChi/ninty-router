@@ -1,7 +1,7 @@
 //! Embedded dashboard (feature `embed-web`): serves the Solid-Start static
 //! bundle from web/.output/public with SPA fallback to index.html.
 
-use axum::http::{StatusCode, header};
+use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 
 #[derive(rust_embed::RustEmbed)]

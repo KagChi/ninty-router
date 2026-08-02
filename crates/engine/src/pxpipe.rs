@@ -97,11 +97,16 @@ pub fn pxpipe_dir(data_dir: &Path) -> PathBuf {
 }
 
 fn package_root(data_dir: &Path) -> PathBuf {
-    pxpipe_dir(data_dir).join("node_modules").join(PXPIPE_PACKAGE)
+    pxpipe_dir(data_dir)
+        .join("node_modules")
+        .join(PXPIPE_PACKAGE)
 }
 
 fn library_entry(data_dir: &Path) -> PathBuf {
-    package_root(data_dir).join("dist").join("core").join("library.js")
+    package_root(data_dir)
+        .join("dist")
+        .join("core")
+        .join("library.js")
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -138,12 +143,7 @@ pub fn get_install_info(data_dir: &Path) -> InstallInfo {
 /// dev; Docker ships node). Same PATH-extension trick as the reference: packaged
 /// environments often miss node bin dirs.
 pub fn find_runtime() -> Option<String> {
-    const EXTRA: &[&str] = &[
-        "/usr/local/bin",
-        "/opt/homebrew/bin",
-        "/usr/bin",
-        "/bin",
-    ];
+    const EXTRA: &[&str] = &["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin", "/bin"];
     let path = std::env::var("PATH").unwrap_or_default();
     let extended = format!(
         "{}:{}:{}",
@@ -550,7 +550,15 @@ pub async fn run_health_check(data_dir: &Path) -> HealthReport {
         "messages": [{ "role": "user", "content": "ping" }],
     });
     let started = Instant::now();
-    match run_shim(data_dir, &test_body, "claude-fable-5", 1, Duration::from_millis(DEFAULT_TIMEOUT_MS)).await {
+    match run_shim(
+        data_dir,
+        &test_body,
+        "claude-fable-5",
+        1,
+        Duration::from_millis(DEFAULT_TIMEOUT_MS),
+    )
+    .await
+    {
         Ok(out) => {
             checks.push(HealthCheck {
                 id: "transform".into(),
@@ -609,7 +617,8 @@ mod tests {
     #[test]
     fn not_installed_skips_fail_open() {
         let dir = std::env::temp_dir().join("ninty-pxpipe-test-none");
-        let body = serde_json::json!({"messages": [{"role": "user", "content": "x".repeat(30000)}]});
+        let body =
+            serde_json::json!({"messages": [{"role": "user", "content": "x".repeat(30000)}]});
         let rt = tokio::runtime::Runtime::new().unwrap();
         let (new_body, s) = rt.block_on(compress_with_pxpipe(
             &body,

@@ -7,11 +7,11 @@ use clap::Parser;
 #[command(name = "ninty-router", about = "Local AI router with dashboard")]
 struct Args {
     /// Port to listen on
-    #[arg(short, long, default_value_t = ninty_core::config::DEFAULT_PORT)]
+    #[arg(short, long, env = "PORT", default_value_t = ninty_core::config::DEFAULT_PORT)]
     port: u16,
 
     /// Host/interface to bind
-    #[arg(short = 'H', long, default_value = "127.0.0.1")]
+    #[arg(short = 'H', long, env = "HOST", default_value = "127.0.0.1")]
     host: String,
 
     /// Do not open the dashboard in a browser
@@ -41,7 +41,10 @@ async fn main() -> ExitCode {
     // Port conflict detection: fail fast with a clear message instead of an
     // opaque bind error deep in axum.
     if std::net::TcpListener::bind((args.host.as_str(), args.port)).is_err() {
-        eprintln!("port {}:{} already in use — is ninty-router already running?", args.host, args.port);
+        eprintln!(
+            "port {}:{} already in use — is ninty-router already running?",
+            args.host, args.port
+        );
         eprintln!("pick another port with --port <n>");
         return ExitCode::FAILURE;
     }
@@ -54,7 +57,10 @@ async fn main() -> ExitCode {
     println!("ninty-router");
     println!("  dashboard:  http://{}:{}/", args.host, args.port);
     println!("  openai api: http://{}:{}/v1", args.host, args.port);
-    println!("  claude api: http://{}:{}/v1/messages", args.host, args.port);
+    println!(
+        "  claude api: http://{}:{}/v1/messages",
+        args.host, args.port
+    );
     println!("  gemini api: http://{}:{}/v1beta", args.host, args.port);
     println!("  data dir:   {}", ninty_core::config::data_dir().display());
 

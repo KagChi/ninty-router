@@ -106,8 +106,7 @@ pub async fn insert_request_detail(db: &Db, d: RequestDetail) -> Result<()> {
             "output_tokens": d.output_tokens,
             "endpoint": d.endpoint,
         });
-        if let (Some(map), Some(serde_json::Value::Object(extra))) =
-            (data.as_object_mut(), d.extra)
+        if let (Some(map), Some(serde_json::Value::Object(extra))) = (data.as_object_mut(), d.extra)
         {
             for (k, v) in extra {
                 map.insert(k, v);
@@ -192,10 +191,9 @@ pub async fn stats(db: &Db) -> Result<serde_json::Value> {
                 ))
             })
         };
-        let (req, inp, outp) = q(
-            "SELECT COUNT(*), SUM(prompt_tokens), SUM(completion_tokens) FROM usage_history",
-        )
-        .map_err(|e| Error::Db(e.to_string()))?;
+        let (req, inp, outp) =
+            q("SELECT COUNT(*), SUM(prompt_tokens), SUM(completion_tokens) FROM usage_history")
+                .map_err(|e| Error::Db(e.to_string()))?;
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
         let (req_t, inp_t, outp_t) = q(&format!(
             "SELECT COUNT(*), SUM(prompt_tokens), SUM(completion_tokens) FROM usage_history
