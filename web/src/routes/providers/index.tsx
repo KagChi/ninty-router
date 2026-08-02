@@ -114,7 +114,7 @@ export default function Providers() {
           <div class="relative">
             <Icon name="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-text-subtle" />
             <input
-              class="h-9 w-64 rounded-[10px] border border-border bg-bg pl-9 pr-3 text-sm text-text-main placeholder:text-text-subtle focus:border-brand-500/50 focus:outline-none focus:shadow-[var(--shadow-focus)]"
+              class="h-9 w-full rounded-[10px] border border-border bg-bg pl-9 pr-3 text-sm text-text-main placeholder:text-text-subtle focus:border-brand-500/50 focus:outline-none focus:shadow-[var(--shadow-focus)] sm:w-64"
               placeholder="Search providers…"
               value={search()}
               onInput={(e) => setSearch(e.currentTarget.value)}

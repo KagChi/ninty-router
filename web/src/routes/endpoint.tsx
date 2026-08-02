@@ -124,7 +124,8 @@ export default function Endpoint() {
               </p>
             }
           >
-            <table class="w-full text-sm">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-border-subtle text-left text-xs font-semibold text-text-muted">
                   <th class="py-2 pr-4">Name</th>
@@ -160,6 +161,8 @@ export default function Endpoint() {
                 </For>
               </tbody>
             </table>
+
+            </div>
           </Show>
         </Show>
       </Card>

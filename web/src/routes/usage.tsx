@@ -154,7 +154,8 @@ export default function UsagePage() {
 
               <div class="grid gap-4 md:grid-cols-2">
                 <Card title="By provider" icon="dns">
-                  <table class="w-full text-xs">
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
                     <thead>
                       <tr class="text-left text-text-muted">
                         <th class="py-1">Provider</th>
@@ -178,10 +179,13 @@ export default function UsagePage() {
                       </For>
                     </tbody>
                   </table>
+
+                  </div>
                 </Card>
 
                 <Card title="By model" icon="model_training">
-                  <table class="w-full text-xs">
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
                     <thead>
                       <tr class="text-left text-text-muted">
                         <th class="py-1">Model</th>
@@ -203,6 +207,8 @@ export default function UsagePage() {
                       </For>
                     </tbody>
                   </table>
+
+                  </div>
                 </Card>
               </div>
             </div>

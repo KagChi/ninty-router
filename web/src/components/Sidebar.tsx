@@ -12,7 +12,7 @@ const NAV = [
 
 const SYSTEM = [{ href: "/settings", label: "Settings", icon: "settings" }];
 
-export default function Sidebar() {
+export default function Sidebar(props: { onClose?: () => void }) {
   const location = useLocation();
   const [dark, setDark] = createSignal(true);
 
@@ -37,6 +37,7 @@ export default function Sidebar() {
   const NavLink = (item: { href: string; label: string; icon: string }) => (
     <A
       href={item.href}
+      onClick={() => props.onClose?.()}
       class={cn(
         "group flex items-center gap-3 rounded-lg px-3 py-1 no-underline transition-all",
         isActive(item.href)
@@ -54,7 +55,7 @@ export default function Sidebar() {
   );
 
   return (
-    <aside class="bg-vibrancy flex min-h-full w-72 flex-col border-r border-border-subtle backdrop-blur-xl transition-colors duration-300">
+    <aside class="bg-vibrancy flex h-full w-72 shrink-0 flex-col border-r border-border-subtle backdrop-blur-xl transition-colors duration-300">
       {/* Traffic lights */}
       <div class="flex items-center gap-2 px-6 pt-5 pb-2">
         <div class="h-3 w-3 rounded-full bg-[#FF5F56]" />

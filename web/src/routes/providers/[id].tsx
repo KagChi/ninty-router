@@ -155,7 +155,7 @@ export default function ProviderDetail() {
         >
         {(p) => (
           <>
-            <div class="flex items-center gap-4">
+            <div class="flex flex-wrap items-center gap-3 sm:gap-4">
               <A
                 href="/providers"
                 class="rounded-lg p-1.5 text-text-muted no-underline hover:bg-surface-2 hover:text-text-main"
@@ -163,34 +163,36 @@ export default function ProviderDetail() {
                 <Icon name="arrow_back" class="text-[20px]" />
               </A>
               <ProviderIcon id={p().id} color={p().color} textIcon={p().text_icon} size={40} />
-              <div class="min-w-0 flex-1">
+              <div class="min-w-0 flex-1 basis-40">
                 <h1 class="text-2xl font-semibold tracking-tight text-text-main">
                   {p().display_name}
                 </h1>
-                <p class="text-sm text-text-muted">
+                <p class="truncate text-sm text-text-muted">
                   <code class="font-mono">{p().id}/model</code>
                   {" · alias "}
                   <code class="font-mono">{p().alias}/model</code>
                 </p>
               </div>
-              <Show when={p().notice_url}>
-                <a
-                  href={p().notice_url!}
-                  target="_blank"
-                  rel="noreferrer"
-                  class="text-sm text-brand-500 hover:underline"
-                >
-                  get key ↗
-                </a>
-              </Show>
-              <Show when={p().category === "oauth"}>
-                <Button size="sm" icon="link" onClick={() => startOauth(p().id)}>
-                  Connect
+              <div class="flex items-center gap-3 max-sm:ml-auto">
+                <Show when={p().notice_url}>
+                  <a
+                    href={p().notice_url!}
+                    target="_blank"
+                    rel="noreferrer"
+                    class="text-sm text-brand-500 hover:underline"
+                  >
+                    get key ↗
+                  </a>
+                </Show>
+                <Show when={p().category === "oauth"}>
+                  <Button size="sm" icon="link" onClick={() => startOauth(p().id)}>
+                    Connect
+                  </Button>
+                </Show>
+                <Button variant="secondary" size="sm" icon="add" onClick={() => setAdding(!adding())}>
+                  Add key
                 </Button>
-              </Show>
-              <Button variant="secondary" size="sm" icon="add" onClick={() => setAdding(!adding())}>
-                Add key
-              </Button>
+              </div>
             </div>
 
             <Show when={error()}>
@@ -222,7 +224,8 @@ export default function ProviderDetail() {
                   </p>
                 }
               >
-                <table class="w-full text-sm">
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
                   <thead>
                     <tr class="border-b border-border-subtle text-left text-xs font-semibold text-text-muted">
                       <th class="py-2 pr-3">Account</th>
@@ -265,6 +268,8 @@ export default function ProviderDetail() {
                     </For>
                   </tbody>
                 </table>
+
+                </div>
               </Show>
             </Card>
 
