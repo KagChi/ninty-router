@@ -34,34 +34,46 @@ async fn list_providers(
     let conns = connections::list(&state.db, None).await?;
     let nodes = nodes::list(&state.db).await?;
 
-    let providers: Vec<serde_json::Value> = registry::all_providers()
-        .map(|p| {
-            let pc: Vec<serde_json::Value> = conns
-                .iter()
-                .filter(|c| c.provider == p.id)
-                .map(|c| serde_json::to_value(c.sanitized()).unwrap_or(json!({})))
-                .collect();
-            json!({
-                "id": p.id,
-                "alias": p.alias,
-                "category": match p.category {
-                    registry::Category::ApiKey => "apikey",
-                    registry::Category::OAuth => "oauth",
-                    registry::Category::Free => "free",
-                },
-                "display_name": p.display_name,
-                "notice_url": p.notice_url,
-                "color": p.color,
-                "text_icon": p.text_icon,
-                "no_auth": p.no_auth,
-                "models": p.models.iter().map(|m| json!({
-                    "id": m.id,
-                    "name": m.name,
-                })).collect::<Vec<_>>(),
-                "connections": pc,
-            })
-        })
-        .collect();
+    let mut providers: Vec<serde_json::Value> = Vec::new();
+    for p in registry::all_providers() {
+        let pc: Vec<serde_json::Value> = conns
+            .iter()
+            .filter(|c| c.provider == p.id)
+            .map(|c| serde_json::to_value(c.sanitized()).unwrap_or(json!({})))
+            .collect();
+        let mut models: Vec<serde_json::Value> = p
+            .models
+            .iter()
+            .map(|m| json!({"id": m.id, "name": m.name}))
+            .collect();
+        // Preloaded upstream lists (opencode/openrouter): fill empty registries,
+        // append extras after static models (deduped by id).
+        if registry::models_fetcher(p.id).is_some() {
+            let fetched = crate::models_preload::cached(&state, p.id).await;
+            for fm in fetched {
+                if models.iter().any(|m| m["id"] == fm.id) {
+                    continue;
+                }
+                models.push(json!({"id": fm.id, "name": fm.name, "suggested": true}));
+            }
+        }
+        providers.push(json!({
+            "id": p.id,
+            "alias": p.alias,
+            "category": match p.category {
+                registry::Category::ApiKey => "apikey",
+                registry::Category::OAuth => "oauth",
+                registry::Category::Free => "free",
+            },
+            "display_name": p.display_name,
+            "notice_url": p.notice_url,
+            "color": p.color,
+            "text_icon": p.text_icon,
+            "no_auth": p.no_auth,
+            "models": models,
+            "connections": pc,
+        }));
+    }
 
     let nodes_json: Vec<serde_json::Value> = nodes
         .iter()
@@ -136,7 +148,22 @@ async fn test_connection(
     if provider.id == "qoder" {
         return Ok(Json(json!({"ok": false, "message": "test not supported for qoder (COSY signing)"})));
     }
-    let model = provider.models.first().map(|m| m.id).unwrap_or("test");
+    // Registry model first; preloaded upstream list for dynamic providers
+    // (opencode has no static models); clear error when nothing to probe with.
+    let model = match provider.models.first().map(|m| m.id.to_string()) {
+        Some(m) => m,
+        None => {
+            let fetched = crate::models_preload::cached(&state, provider.id).await;
+            match fetched.first() {
+                Some(m) => m.id.clone(),
+                None => {
+                    return Ok(Json(
+                        json!({"ok": false, "message": "no models available to test (preload pending or upstream unreachable)"}),
+                    ));
+                }
+            }
+        }
+    };
     let spec = format!("{}/{model}", provider.id);
 
     // Same target + URL + auth pipeline the chat path uses — transport-aware

@@ -26,8 +26,17 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> Json<serde_json:
             continue;
         }
         if provider.id == "opencode" {
-            // dynamic free model list (cached); passthrough accepts any id
-            if let Ok(ids) = crate::opencode_models::fetch(&state).await {
+            // dynamic free model list: preloaded cache first, live fetch fallback
+            let cached = crate::models_preload::cached(&state, "opencode").await;
+            if !cached.is_empty() {
+                for m in cached {
+                    data.push(json!({
+                        "id": format!("oc/{}", m.id),
+                        "object": "model",
+                        "owned_by": "opencode",
+                    }));
+                }
+            } else if let Ok(ids) = crate::opencode_models::fetch(&state).await {
                 for id in ids {
                     data.push(json!({
                         "id": format!("oc/{id}"),
@@ -44,6 +53,20 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> Json<serde_json:
                 "object": "model",
                 "owned_by": provider.id,
             }));
+        }
+        // Preloaded upstream extras (openrouter suggested free models).
+        if registry::models_fetcher(provider.id).is_some() {
+            let fetched = crate::models_preload::cached(&state, provider.id).await;
+            for m in fetched {
+                if provider.models.iter().any(|sm| sm.id == m.id) {
+                    continue;
+                }
+                data.push(json!({
+                    "id": format!("{}/{}", provider.id, m.id),
+                    "object": "model",
+                    "owned_by": provider.id,
+                }));
+            }
         }
     }
     for node in nodes {

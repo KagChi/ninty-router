@@ -3,6 +3,7 @@
 pub mod codex_instructions;
 pub mod executor;
 pub mod fallback;
+pub mod models_fetch;
 pub mod oauth;
 pub mod pxpipe;
 pub mod qoder;

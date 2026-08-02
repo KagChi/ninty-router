@@ -896,7 +896,11 @@ pub(crate) async fn resolve_targets(
         .map(|m| m.upstream_model_id.unwrap_or(m.id).to_string())
         .unwrap_or_else(|| model.clone());
     if !provider.models.is_empty() && registry::find_model(provider, &model).is_none() {
-        return Err(Error::BadRequest(format!("unknown model '{spec}'")));
+        // Preloaded upstream list may know it (openrouter suggested free models).
+        let fetched = crate::models_preload::cached(state, provider.id).await;
+        if !fetched.iter().any(|m| m.id == model) {
+            return Err(Error::BadRequest(format!("unknown model '{spec}'")));
+        }
     }
 
     let conns = connections::list(&state.db, Some(provider.id)).await?;

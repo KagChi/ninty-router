@@ -780,6 +780,31 @@ pub fn resolve(spec: &str) -> Option<(&'static ProviderDef, String)> {
     Some((provider, model_part.to_string()))
 }
 
+/// Filter applied to an upstream models endpoint (9router suggested-models filters).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelsFilter {
+    /// opencode.ai zen: ids ending in "-free" (+ known free ones like big-pickle).
+    OpencodeFree,
+    /// openrouter: zero-price models with >=200k context, sorted by context desc.
+    OpenrouterFree,
+}
+
+/// Upstream models endpoint for providers with dynamic model lists
+/// (9router `modelsFetcher`). Returns (url, filter).
+pub fn models_fetcher(provider_id: &str) -> Option<(&'static str, ModelsFilter)> {
+    match provider_id {
+        "opencode" => Some((
+            "https://opencode.ai/zen/v1/models",
+            ModelsFilter::OpencodeFree,
+        )),
+        "openrouter" => Some((
+            "https://openrouter.ai/api/v1/models",
+            ModelsFilter::OpenrouterFree,
+        )),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
