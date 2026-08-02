@@ -5,6 +5,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+embed-web = ["server/embed-web"]
+
 [[bin]]
 name = "ninty-router"
 path = "src/main.rs"

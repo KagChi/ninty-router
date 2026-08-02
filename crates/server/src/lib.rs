@@ -7,6 +7,8 @@ pub mod opencode_models;
 pub mod repos;
 pub mod state;
 pub mod v1;
+#[cfg(feature = "embed-web")]
+pub mod web_static;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -15,7 +17,10 @@ use state::AppState;
 
 /// Build the full axum router.
 pub fn build_router(state: Arc<AppState>) -> axum::Router {
-    api::router(state)
+    let app = api::router(state);
+    #[cfg(feature = "embed-web")]
+    let app = app.fallback(web_static::static_handler);
+    app
 }
 
 /// Run the HTTP server until SIGTERM/SIGINT.
