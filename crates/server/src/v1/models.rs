@@ -25,11 +25,15 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> Json<serde_json:
         if !has_conn {
             continue;
         }
+        let disabled = crate::api::models_admin::disabled_ids(&state, provider.id).await;
         if provider.id == "opencode" {
             // dynamic free model list: preloaded cache first, live fetch fallback
             let cached = crate::models_preload::cached(&state, "opencode").await;
             if !cached.is_empty() {
                 for m in cached {
+                    if disabled.contains(&m.id) {
+                        continue;
+                    }
                     data.push(json!({
                         "id": format!("oc/{}", m.id),
                         "object": "model",
@@ -38,6 +42,9 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> Json<serde_json:
                 }
             } else if let Ok(ids) = crate::opencode_models::fetch(&state).await {
                 for id in ids {
+                    if disabled.contains(&id) {
+                        continue;
+                    }
                     data.push(json!({
                         "id": format!("oc/{id}"),
                         "object": "model",
@@ -48,6 +55,9 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> Json<serde_json:
             continue;
         }
         for m in provider.models {
+            if disabled.iter().any(|d| d == m.id) {
+                continue;
+            }
             data.push(json!({
                 "id": format!("{}/{}", provider.id, m.id),
                 "object": "model",
@@ -58,7 +68,7 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> Json<serde_json:
         if registry::models_fetcher(provider.id).is_some() {
             let fetched = crate::models_preload::cached(&state, provider.id).await;
             for m in fetched {
-                if provider.models.iter().any(|sm| sm.id == m.id) {
+                if provider.models.iter().any(|sm| sm.id == m.id) || disabled.contains(&m.id) {
                     continue;
                 }
                 data.push(json!({
@@ -67,6 +77,17 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> Json<serde_json:
                     "owned_by": provider.id,
                 }));
             }
+        }
+        // Custom user-added models.
+        for id in crate::api::models_admin::list_custom_for(&state, provider.id).await {
+            if disabled.contains(&id) || provider.models.iter().any(|sm| sm.id == id) {
+                continue;
+            }
+            data.push(json!({
+                "id": format!("{}/{}", provider.id, id),
+                "object": "model",
+                "owned_by": provider.id,
+            }));
         }
     }
     for node in nodes {

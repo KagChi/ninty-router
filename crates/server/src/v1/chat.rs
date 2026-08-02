@@ -80,13 +80,17 @@ pub(crate) async fn run(
     endpoint: &'static str,
 ) -> Result<Response, ApiError> {
     let stream = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
-    let model = body
+    let mut model = body
         .get("model")
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_string();
     if model.is_empty() {
         return Err(Error::BadRequest("missing model".into()).into());
+    }
+    // Global model aliases (9router /api/models/alias): alias → target spec.
+    if let Some(target) = crate::api::models_admin::resolve_alias(&state, &model).await {
+        model = target;
     }
 
     // API key enforcement
@@ -899,8 +903,20 @@ pub(crate) async fn resolve_targets(
         // Preloaded upstream list may know it (openrouter suggested free models).
         let fetched = crate::models_preload::cached(state, provider.id).await;
         if !fetched.iter().any(|m| m.id == model) {
-            return Err(Error::BadRequest(format!("unknown model '{spec}'")));
+            // Custom user-added models also valid (9router passthrough).
+            let custom = crate::api::models_admin::list_custom_for(state, provider.id).await;
+            if !custom.iter().any(|m| m == &model) {
+                return Err(Error::BadRequest(format!("unknown model '{spec}'")));
+            }
         }
+    }
+    // Disabled models are hidden + unroutable (9router /api/models/disabled).
+    if crate::api::models_admin::disabled_ids(state, provider.id)
+        .await
+        .iter()
+        .any(|m| m == &model)
+    {
+        return Err(Error::BadRequest(format!("model '{spec}' is disabled")));
     }
 
     let conns = connections::list(&state.db, Some(provider.id)).await?;

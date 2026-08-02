@@ -17,6 +17,15 @@ export interface Connection {
   };
 }
 
+export interface ModelEntry {
+  id: string;
+  name: string;
+  suggested?: boolean;
+  custom?: boolean;
+  disabled?: boolean;
+  caps?: { vision: boolean; reasoning: boolean };
+}
+
 export interface Provider {
   id: string;
   alias: string;
@@ -26,7 +35,7 @@ export interface Provider {
   color: string;
   text_icon: string;
   no_auth: boolean;
-  models: { id: string; name: string }[];
+  models: ModelEntry[];
   connections: Connection[];
 }
 

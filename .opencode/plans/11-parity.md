@@ -150,3 +150,9 @@ live e2e against running server where credentials/mocks allow.
 ## Status log
 
 - 2026-08-02: plan created. P1 started.
+- 2026-08-02: **P1 DONE** (cb3487b) — raw quota contract, 6 fetchers, features
+  eligibility, per-conn live endpoint, quota.tsx 1:1 (filters/sort/pagination/
+  auto-refresh/per-card refresh). Verified live + playwright both viewports.
+- 2026-08-02: **P2 DONE** (dd5e76d) — test matrix per-provider probes,
+  refresh-before-probe + 401 retry, testStatus active/error. Verified live:
+  codebuddy-cn tokenExists, deepseek/groq GET-models 401, codebuddy-intl 401.

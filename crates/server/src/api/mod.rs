@@ -3,6 +3,7 @@ mod combos;
 mod import;
 mod keys;
 mod oauth;
+pub mod models_admin;
 mod providers;
 mod pxpipe;
 mod quota;
@@ -30,6 +31,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .nest("/import", import::router())
         .nest("/usage", quota::router())
         .nest("/keys", keys::router())
+        .nest("/models", models_admin::router())
         .nest("/providers", providers::router())
         .nest("/pxpipe", pxpipe::router())
         .with_state(state.clone());

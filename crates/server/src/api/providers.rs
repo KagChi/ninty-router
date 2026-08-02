@@ -22,6 +22,8 @@ pub fn router() -> Router<Arc<AppState>> {
             axum::routing::put(update_connection).delete(delete_connection),
         )
         .route("/{id}/test", post(test_connection))
+        .route("/export/{provider}", get(export_connections))
+        .route("/import/{provider}", post(import_connections))
         .route("/nodes", get(list_nodes).post(create_node))
         .route("/nodes/{id}", axum::routing::delete(delete_node))
 }
@@ -41,10 +43,19 @@ async fn list_providers(
             .filter(|c| c.provider == p.id)
             .map(|c| serde_json::to_value(c.sanitized()).unwrap_or(json!({})))
             .collect();
+        let disabled = crate::api::models_admin::disabled_ids(&state, p.id).await;
         let mut models: Vec<serde_json::Value> = p
             .models
             .iter()
-            .map(|m| json!({"id": m.id, "name": m.name}))
+            .map(|m| {
+                let caps = ninty_core::capabilities::capabilities(p.id, m.id);
+                json!({
+                    "id": m.id,
+                    "name": m.name,
+                    "caps": { "vision": caps.vision, "reasoning": caps.reasoning },
+                    "disabled": disabled.iter().any(|d| d == m.id),
+                })
+            })
             .collect();
         // Preloaded upstream lists (opencode/openrouter): fill empty registries,
         // append extras after static models (deduped by id).
@@ -54,8 +65,34 @@ async fn list_providers(
                 if models.iter().any(|m| m["id"] == fm.id) {
                     continue;
                 }
-                models.push(json!({"id": fm.id, "name": fm.name, "suggested": true}));
+                let caps = ninty_core::capabilities::capabilities(p.id, &fm.id);
+                models.push(json!({
+                    "id": fm.id,
+                    "name": fm.name,
+                    "suggested": true,
+                    "caps": { "vision": caps.vision, "reasoning": caps.reasoning },
+                    "disabled": disabled.contains(&fm.id),
+                }));
             }
+        }
+        // Custom user-added models first (9router orders them first).
+        let custom = crate::api::models_admin::custom_models(&state, p.id).await;
+        for cm in custom.into_iter().rev() {
+            let caps = ninty_core::capabilities::capabilities(
+                p.id,
+                cm.get("id").and_then(|v| v.as_str()).unwrap_or(""),
+            );
+            let id = cm.get("id").cloned().unwrap_or(json!(""));
+            models.insert(
+                0,
+                json!({
+                    "id": id,
+                    "name": cm.get("name").cloned().unwrap_or(id),
+                    "custom": true,
+                    "caps": { "vision": caps.vision, "reasoning": caps.reasoning },
+                    "disabled": disabled.iter().any(|d| Some(d.as_str()) == cm.get("id").and_then(|v| v.as_str())),
+                }),
+            );
         }
         providers.push(json!({
             "id": p.id,
@@ -132,6 +169,101 @@ async fn delete_connection(
     connections::delete(&state.db, &id).await?;
     Ok(Json(json!({"ok": true})))
 }
+
+/// Export connections of provider as JSON (9router /api/providers/[id]/export).
+/// Includes api_key (full secrets, like 9router export file).
+async fn export_connections(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(provider): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_session(&state, &headers).await?;
+    let conns = connections::list(&state.db, Some(&provider)).await?;
+    let out: Vec<serde_json::Value> = conns
+        .iter()
+        .map(|c| {
+            json!({
+                "name": c.name,
+                "priority": c.priority,
+                "apiKey": c.api_key(),
+                "providerSpecificData": c.data,
+            })
+        })
+        .collect();
+    Ok(Json(json!({"connections": out})))
+}
+
+/// Import connections JSON (9router /api/providers/[id]/import).
+/// Accepts {"connections": [...]} — name, priority, apiKey, providerSpecificData.
+/// Skips entries with no apiKey for key-based providers. Returns created count.
+async fn import_connections(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(provider): Path<String>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_session(&state, &headers).await?;
+    if registry::find_provider(&provider).is_none() {
+        return Err(ninty_core::error::Error::BadRequest(format!(
+            "unknown provider '{provider}'"
+        ))
+        .into());
+    }
+    let items = body
+        .get("connections")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    if items.is_empty() {
+        return Err(ninty_core::error::Error::BadRequest("no connections in file".into()).into());
+    }
+    let existing = connections::list(&state.db, Some(&provider)).await?;
+    let mut created = 0usize;
+    for (i, item) in items.iter().enumerate() {
+        let api_key = item
+            .get("apiKey")
+            .or_else(|| item.get("api_key"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        // Skip dupes: same api_key already on this provider.
+        if !api_key.is_empty()
+            && existing
+                .iter()
+                .any(|c| c.api_key() == Some(api_key.as_str()))
+        {
+            continue;
+        }
+        let priority = item
+            .get("priority")
+            .and_then(|v| v.as_i64())
+            .unwrap_or((existing.len() + i + 1) as i64);
+        let data = item
+            .get("providerSpecificData")
+            .or_else(|| item.get("data"))
+            .cloned()
+            .unwrap_or(json!({}));
+        let name = item
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(String::from)
+            .unwrap_or_else(|| format!("{} #{}", provider, existing.len() + created + 1));
+        connections::create(
+            &state.db,
+            NewConnection {
+                provider: provider.clone(),
+                name: Some(name),
+                priority: Some(priority),
+                api_key: if api_key.is_empty() { None } else { Some(api_key) },
+                data: Some(data),
+            },
+        )
+        .await?;
+        created += 1;
+    }
+    Ok(Json(json!({"ok": true, "created": created})))
+}
+
 
 /// Test: per-provider probe matrix (9router testUtils.js 1:1). Stores
 /// testStatus "active"/"error" + lastError in connection data.
