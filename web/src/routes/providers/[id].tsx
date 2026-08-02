@@ -245,7 +245,7 @@ export default function ProviderDetail() {
                             </Badge>
                           </td>
                           <td class="py-2.5 pr-3 text-xs text-text-muted">
-                            {testResult()[c.id] ?? c.data.testStatus ?? ""}
+                            {testResult()[c.id] ?? (c.data.testStatus === "ok" ? "active" : c.data.testStatus) ?? ""}
                           </td>
                           <td class="py-2.5 text-right">
                             <Button variant="ghost" size="sm" onClick={() => test(c.id)}>
