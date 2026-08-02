@@ -156,3 +156,8 @@ live e2e against running server where credentials/mocks allow.
 - 2026-08-02: **P2 DONE** (dd5e76d) — test matrix per-provider probes,
   refresh-before-probe + 401 retry, testStatus active/error. Verified live:
   codebuddy-cn tokenExists, deepseek/groq GET-models 401, codebuddy-intl 401.
+- 2026-08-02: **P3 DONE** (42c64cf) — models APIs (alias/disabled/custom/test),
+  capabilities globs, detail page Models card + Connections card 1:1 (priority
+  arrows, RR toggle + sticky via provider_strategies, import/export endpoints,
+  Test 1 by 1, bulk select ops). Skipped: P3d banners/anthropic-compatible —
+  not present in ninty registry, out of scope.

@@ -79,8 +79,13 @@ pub struct ProviderDef {
     pub alt_transports: &'static [Transport],
     /// No credential needed (free providers); literal "public" bearer used.
     pub no_auth: bool,
+    /// 9router display.deprecated — yellow RISK_NOTICE banner on detail page.
+    pub deprecated: bool,
     pub models: &'static [ModelDef],
 }
+
+/// 9router RISK_NOTICE (providersDisplay.js) 1:1.
+pub const RISK_NOTICE: &str = "⚠️ Risk Notice: This provider uses a subscription/OAuth session not officially licensed for proxy/router use. Account may be restricted or banned. Use at your own risk.";
 
 const fn t(base_url: &'static str) -> Transport {
     Transport {
@@ -142,6 +147,7 @@ pub static PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
 
         models: &[
             m("claude-opus-4.7", "Claude Opus 4.7"),
@@ -167,6 +173,7 @@ pub static PROVIDERS: &[ProviderDef] = &[
         // passthrough: any model id accepted; static list is a convenience subset
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
 
         models: &[
             m("anthropic/claude-sonnet-4.6", "Claude Sonnet 4.6"),
@@ -186,6 +193,7 @@ pub static PROVIDERS: &[ProviderDef] = &[
         transport: t("https://api.deepseek.com/chat/completions"),
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
 
         models: &[
             m("deepseek-chat", "DeepSeek Chat"),
@@ -203,6 +211,7 @@ pub static PROVIDERS: &[ProviderDef] = &[
         transport: t("https://api.groq.com/openai/v1/chat/completions"),
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
 
         models: &[
             m("llama-3.3-70b-versatile", "Llama 3.3 70B"),
@@ -220,6 +229,7 @@ pub static PROVIDERS: &[ProviderDef] = &[
         transport: t("https://api.mistral.ai/v1/chat/completions"),
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
 
         models: &[
             m("mistral-large-latest", "Mistral Large"),
@@ -237,6 +247,7 @@ pub static PROVIDERS: &[ProviderDef] = &[
         transport: t("https://api.x.ai/v1/chat/completions"),
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
 
         models: &[
             m("grok-4.3", "Grok 4.3"),
@@ -254,6 +265,7 @@ pub static PROVIDERS: &[ProviderDef] = &[
         transport: t("https://api.together.xyz/v1/chat/completions"),
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
 
         models: &[
             m(
@@ -274,6 +286,7 @@ pub static PROVIDERS: &[ProviderDef] = &[
         transport: t("https://api.blackbox.ai/v1/chat/completions"),
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
 
         models: &[
             mu(
@@ -359,6 +372,7 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: &[],
         no_auth: false,
+        deprecated: true,
         models: &[
             m("claude-opus-5", "Claude Opus 5"),
             m("claude-fable-5", "Claude Fable 5"),
@@ -386,6 +400,7 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: &[],
         no_auth: false,
+        deprecated: true,
         models: &[
             m("gpt-5.6-sol", "GPT 5.6 Sol"),
             m("gpt-5.6-terra", "GPT 5.6 Terra"),
@@ -419,6 +434,7 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: &[],
         no_auth: false,
+        deprecated: true,
         models: &[
             m("gpt-5.4", "GPT-5.4"),
             m("gpt-5.4-mini", "GPT-5.4 Mini"),
@@ -446,6 +462,7 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
         models: &[
             m("anthropic/claude-opus-4.7", "Claude Opus 4.7"),
             m("anthropic/claude-sonnet-4.6", "Claude Sonnet 4.6"),
@@ -482,6 +499,7 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
         models: &[
             m("glm-5.2", "GLM-5.2"),
             m("glm-5.1", "GLM-5.1"),
@@ -522,6 +540,7 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
         models: &[
             m("gemini-3.1-pro", "Gemini 3.1 Pro"),
             m("gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
@@ -558,6 +577,7 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
         models: &[
             m("auto", "Auto"),
             m("ultimate", "Ultimate"),
@@ -592,6 +612,7 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
         models: &[
             m("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
             m("gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite"),
@@ -612,6 +633,7 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: GLM_ALT,
         no_auth: false,
+        deprecated: false,
         models: &[
             m("glm-5.2", "GLM-5.2"),
             m("glm-5.1", "GLM-5.1"),
@@ -631,6 +653,7 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         transport: t("https://open.bigmodel.cn/api/coding/paas/v4/chat/completions"),
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
         models: &[
             m("glm-5.2", "GLM-5.2"),
             m("glm-5.1", "GLM-5.1"),
@@ -654,6 +677,7 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: MINIMAX_ALT,
         no_auth: false,
+        deprecated: false,
         models: &[
             m("MiniMax-M3", "MiniMax-M3"),
             m("MiniMax-M2.7", "MiniMax-M2.7"),
@@ -675,6 +699,7 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: MINIMAX_CN_ALT,
         no_auth: false,
+        deprecated: false,
         models: &[
             m("MiniMax-M3", "MiniMax-M3"),
             m("MiniMax-M2.7", "MiniMax-M2.7"),
@@ -696,6 +721,7 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: KIMI_ALT,
         no_auth: false,
+        deprecated: false,
         models: &[
             m("kimi-k2.7-code", "Kimi K2.7 Code"),
             m("kimi-k2.6", "Kimi K2.6"),
@@ -719,6 +745,7 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: &[],
         no_auth: true,
+        deprecated: false,
         models: &[],
     },
     ProviderDef {
@@ -737,6 +764,7 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         },
         alt_transports: &[],
         no_auth: false,
+        deprecated: false,
         models: &[
             m("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
             m("gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite"),

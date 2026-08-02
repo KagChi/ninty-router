@@ -11,7 +11,7 @@ export default function Providers() {
   });
   const [search, setSearch] = createSignal("");
   const [showNode, setShowNode] = createSignal(false);
-  const [nodeForm, setNodeForm] = createSignal({ prefix: "", base_url: "", api_key: "", name: "" });
+  const [nodeForm, setNodeForm] = createSignal({ prefix: "", base_url: "", api_key: "", name: "", api_type: "openai" });
   const [error, setError] = createSignal("");
   const [testing, setTesting] = createSignal<string | null>(null);
 
@@ -69,11 +69,12 @@ export default function Providers() {
           prefix: nodeForm().prefix,
           base_url: nodeForm().base_url,
           api_key: nodeForm().api_key || null,
+          api_type: nodeForm().api_type,
           name: nodeForm().name || null,
         }),
       });
       setShowNode(false);
-      setNodeForm({ prefix: "", base_url: "", api_key: "", name: "" });
+      setNodeForm({ prefix: "", base_url: "", api_key: "", name: "", api_type: "openai" });
       refetch();
     } catch (e) {
       setError(e instanceof Error ? e.message : "failed");
@@ -131,8 +132,11 @@ export default function Providers() {
 
       {/* Custom Providers */}
       <div class="flex flex-col gap-4">
-        <SectionHeader title="Custom Providers (OpenAI Compatible)">
-          <Button variant="secondary" size="sm" icon="add" onClick={() => setShowNode(true)}>
+        <SectionHeader title="Custom Providers (OpenAI/Anthropic Compatible)">
+          <Button size="sm" icon="add" onClick={() => { setNodeForm({ ...nodeForm(), api_type: "anthropic" }); setShowNode(true); }}>
+            Add Anthropic Compatible
+          </Button>
+          <Button variant="secondary" size="sm" icon="add" onClick={() => { setNodeForm({ ...nodeForm(), api_type: "openai" }); setShowNode(true); }}>
             Add OpenAI Compatible
           </Button>
         </SectionHeader>
@@ -161,6 +165,11 @@ export default function Providers() {
                         <p class="truncate font-mono text-xs text-text-muted">
                           {n.data.prefix}/… · {n.data.baseUrl}
                         </p>
+                        <Show when={n.data.apiType && n.data.apiType !== "openai"}>
+                          <span class="mt-0.5 inline-block rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-text-muted">
+                            {n.data.apiType}
+                          </span>
+                        </Show>
                       </div>
                     </div>
                     <Button
@@ -226,7 +235,7 @@ export default function Providers() {
       {/* Add node modal */}
       <Modal
         open={showNode()}
-        title="Add OpenAI Compatible provider"
+        title={nodeForm().api_type === "anthropic" ? "Add Anthropic Compatible provider" : "Add OpenAI Compatible provider"}
         onClose={() => setShowNode(false)}
         footer={
           <>

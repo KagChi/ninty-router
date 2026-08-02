@@ -107,6 +107,8 @@ async fn list_providers(
             "color": p.color,
             "text_icon": p.text_icon,
             "no_auth": p.no_auth,
+            "deprecated": p.deprecated,
+            "deprecation_notice": p.deprecated.then_some(registry::RISK_NOTICE),
             "models": models,
             "connections": pc,
         }));

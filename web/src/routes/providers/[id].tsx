@@ -425,6 +425,16 @@ export default function ProviderDetail() {
               </div>
             </div>
 
+            {/* 9router deprecation banner (yellow, RISK_NOTICE) */}
+            <Show when={p().deprecated}>
+              <div class="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
+                <Icon name="warning" class="mt-0.5 shrink-0 text-[16px] text-yellow-500" />
+                <p class="text-xs leading-relaxed text-yellow-600 dark:text-yellow-400">
+                  {p().deprecation_notice}
+                </p>
+              </div>
+            </Show>
+
             <Show when={error()}>
               <p class="flex items-center gap-1.5 text-sm text-danger">
                 <Icon name="error" class="text-[16px]" /> {error()}

@@ -35,6 +35,8 @@ export interface Provider {
   color: string;
   text_icon: string;
   no_auth: boolean;
+  deprecated?: boolean;
+  deprecation_notice?: string | null;
   models: ModelEntry[];
   connections: Connection[];
 }
@@ -42,7 +44,7 @@ export interface Provider {
 export interface Node {
   id: string;
   name: string | null;
-  data: { prefix?: string; baseUrl?: string; apiKey?: string };
+  data: { prefix?: string; baseUrl?: string; apiKey?: string; apiType?: string };
 }
 
 export function ProviderIcon(props: { id: string; color: string; textIcon: string; size?: number }) {
