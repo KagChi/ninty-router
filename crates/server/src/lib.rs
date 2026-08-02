@@ -16,12 +16,31 @@ use std::sync::Arc;
 
 use state::AppState;
 
+/// HTTP access log middleware: `METHOD /path → status (Nms)`.
+async fn access_log(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let method = req.method().clone();
+    let path = req.uri().path().to_string();
+    let started = std::time::Instant::now();
+    let res = next.run(req).await;
+    tracing::info!(
+        "{} {} → {} ({}ms)",
+        method,
+        path,
+        res.status().as_u16(),
+        started.elapsed().as_millis()
+    );
+    res
+}
+
 /// Build the full axum router.
 pub fn build_router(state: Arc<AppState>) -> axum::Router {
     let app = api::router(state);
     #[cfg(feature = "embed-web")]
     let app = app.fallback(web_static::static_handler);
-    app
+    app.layer(axum::middleware::from_fn(access_log))
 }
 
 /// Run the HTTP server until SIGTERM/SIGINT.

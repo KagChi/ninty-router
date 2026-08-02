@@ -311,7 +311,16 @@ async fn run_single(
             Err(e) => return Err((500, e.to_string(), Verdict::NoFallback)),
         };
 
-        let send = send_request(&state.http, &url, &headers, &body_out, target.timeout_ms).await;
+        let send = send_request(
+            &state.http,
+            &target.provider_id,
+            &target.model,
+            &url,
+            &headers,
+            &body_out,
+            target.timeout_ms,
+        )
+        .await;
         let resp = match send {
             Ok(r) => r,
             Err((status, text)) => {
@@ -362,6 +371,8 @@ async fn run_single(
                             {
                                 if let Ok(r2) = send_request(
                                     &state.http,
+                                    &t2.provider_id,
+                                    &t2.model,
                                     &url2,
                                     &headers2,
                                     &body_out,
@@ -1223,12 +1234,18 @@ pub(crate) async fn build_url_and_auth(
 
 async fn send_request(
     client: &reqwest::Client,
+    provider: &str,
+    model: &str,
     url: &str,
     headers: &[(String, String)],
     body: &Value,
     timeout_ms: u64,
 ) -> Result<reqwest::Response, (u16, String)> {
     let mut attempt = 0u32;
+    let started = std::time::Instant::now();
+    // Strip credentials from log line (QueryKey puts key in URL).
+    let log_url = url.split('?').next().unwrap_or(url);
+    tracing::info!("→ upstream {provider}/{model} POST {log_url}");
     loop {
         let mut req = client
             .post(url)
@@ -1242,6 +1259,10 @@ async fn send_request(
         match req.json(body).send().await {
             Ok(resp) => {
                 let status = resp.status().as_u16();
+                tracing::info!(
+                    "← upstream {provider}/{model} {status} ({}ms)",
+                    started.elapsed().as_millis()
+                );
                 if let Some((max_attempts, delay_ms)) = retry_config_for(status) {
                     attempt += 1;
                     if attempt < max_attempts {
@@ -1257,6 +1278,10 @@ async fn send_request(
                     tokio::time::sleep(std::time::Duration::from_millis(1_000)).await;
                     continue;
                 }
+                tracing::info!(
+                    "← upstream {provider}/{model} network error: {e} ({}ms)",
+                    started.elapsed().as_millis()
+                );
                 return Err((502, format!("upstream request failed: {e}")));
             }
         }
@@ -1718,6 +1743,8 @@ async fn run_qoder(
 
     let resp = send_request(
         &state.http,
+        "qoder",
+        &target.model,
         engine::qoder::CHAT_URL,
         &headers,
         &qoder_body,
