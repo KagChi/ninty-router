@@ -6,10 +6,16 @@ import { ProviderIcon, type Connection, type Provider } from "~/components/provi
 
 export default function ProviderDetail() {
   const params = useParams();
-  const [data, { refetch }] = createResource(async () => {
-    const d = await api<{ providers: Provider[] }>("/providers");
-    return d.providers.find((p) => p.id === params.id) ?? null;
-  });
+  // Key on params.id: route modules lazy-load, params populate async — the
+  // resource must re-run when the id becomes available.
+  const [data, { refetch }] = createResource(
+    () => params.id,
+    async (id) => {
+      if (!id) return undefined;
+      const d = await api<{ providers: Provider[] }>("/providers");
+      return d.providers.find((p) => p.id === id) ?? null;
+    }
+  );
 
   const [adding, setAdding] = createSignal(false);
   const [keyInput, setKeyInput] = createSignal("");
