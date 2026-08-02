@@ -6,6 +6,7 @@ interface QuotaWindow {
   label: string;
   used: number;
   reset_at: string | null;
+  recurring: boolean;
 }
 
 interface QuotaReport {
@@ -17,16 +18,17 @@ interface QuotaReport {
   fetched_at: string;
 }
 
-function countdown(resetAt: string | null, now: number): string {
+function countdown(resetAt: string | null, now: number, recurring: boolean): string {
   if (!resetAt) return "";
   const ms = new Date(resetAt).getTime() - now;
-  if (ms <= 0) return "resetting…";
+  const verb = recurring ? "resets" : "expires";
+  if (ms <= 0) return recurring ? "resetting…" : "expired";
   const h = Math.floor(ms / 3_600_000);
   const m = Math.floor((ms % 3_600_000) / 60_000);
   const d = Math.floor(h / 24);
-  if (d > 0) return `resets in ${d}d ${h % 24}h`;
-  if (h > 0) return `resets in ${h}h ${m}m`;
-  return `resets in ${m}m`;
+  if (d > 0) return `${verb} in ${d}d ${h % 24}h`;
+  if (h > 0) return `${verb} in ${h}h ${m}m`;
+  return `${verb} in ${m}m`;
 }
 
 function barClass(used: number): string {
@@ -89,7 +91,7 @@ export default function QuotaPage() {
                               {w.used.toFixed(0)}% used
                               <Show when={w.reset_at}>
                                 {" · "}
-                                {countdown(w.reset_at, now())}
+                                {countdown(w.reset_at, now(), w.recurring)}
                               </Show>
                             </span>
                           </div>

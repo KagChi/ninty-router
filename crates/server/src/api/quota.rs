@@ -74,9 +74,11 @@ async fn cache_get(state: &Arc<AppState>, key: &str) -> Option<Value> {
         .db
         .call(move |conn| {
             Ok(conn
-                .query_row("SELECT value FROM kv WHERE key = ?1", [&key], |r| {
-                    r.get::<_, String>(0)
-                })
+                .query_row(
+                    "SELECT value FROM kv WHERE scope = 'quota' AND key = ?1",
+                    [&key],
+                    |r| r.get::<_, String>(0),
+                )
                 .ok())
         })
         .await
@@ -100,8 +102,8 @@ async fn cache_set(state: &Arc<AppState>, key: &str, data: &Value) {
         .db
         .call(move |conn| {
             conn.execute(
-                "INSERT INTO kv (key, value) VALUES (?1, ?2)
-                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                "INSERT INTO kv (scope, key, value) VALUES ('quota', ?1, ?2)
+                 ON CONFLICT(scope, key) DO UPDATE SET value = excluded.value",
                 [&key, &payload],
             )
             .map_err(|e| ninty_core::error::Error::Db(e.to_string()))?;

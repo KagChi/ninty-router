@@ -9,6 +9,14 @@ pub struct QuotaWindow {
     /// % used (0-100).
     pub used: f64,
     pub reset_at: Option<String>,
+    /// true = allowance replenishes at reset_at ("resets in");
+    /// false = one-shot credits that expire for good ("expires in").
+    #[serde(default = "default_recurring")]
+    pub recurring: bool,
+}
+
+fn default_recurring() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -42,6 +50,15 @@ fn reset_of(v: &Value, keys: &[&str]) -> Option<String> {
     for k in keys {
         if let Some(x) = v.get(k) {
             if let Some(s) = x.as_str() {
+                // Numeric strings are unix epochs (sec or ms), like 9router parseResetTime.
+                if !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()) {
+                    if let Ok(n) = s.parse::<i64>() {
+                        let ms = if n < 1_000_000_000_000 { n * 1000 } else { n };
+                        if let Some(t) = chrono::DateTime::from_timestamp_millis(ms) {
+                            return Some(t.to_rfc3339());
+                        }
+                    }
+                }
                 return Some(s.into());
             }
             if let Some(n) = x.as_i64() {
@@ -133,6 +150,7 @@ pub async fn codex(
                             .or_else(|| w.get("percent_used"))
                             .unwrap_or(&Value::Null)),
                         reset_at: reset_of(&w, &["reset_at", "resets_at", "resetAt"]),
+                        recurring: true,
                     });
                 }
             }
@@ -192,6 +210,7 @@ pub async fn github(client: &reqwest::Client, conn_id: &str, github_token: &str)
                             label: label.into(),
                             used,
                             reset_at: reset_of(&v, &["quota_reset_date", "quota_reset_date_utc"]),
+                            recurring: true,
                         });
                     }
                 }
@@ -210,6 +229,7 @@ pub async fn github(client: &reqwest::Client, conn_id: &str, github_token: &str)
                                     &v,
                                     &["quota_reset_date", "monthly_quota_reset_date"],
                                 ),
+                                recurring: true,
                             });
                         }
                     }
@@ -263,6 +283,7 @@ pub async fn claude(client: &reqwest::Client, conn_id: &str, access_token: &str)
                             label: label.into(),
                             used: u.clamp(0.0, 100.0),
                             reset_at: reset_of(w, &["resets_at", "reset_at", "resetAt"]),
+                            recurring: true,
                         });
                     }
                 }
@@ -297,15 +318,19 @@ pub async fn codebuddy(
     } else {
         "https://www.codebuddy.ai"
     };
-    let ua = if provider == "codebuddy-cn" {
-        "CLI/2.108.1 CodeBuddy/2.108.1"
+    let (ua, ide) = if provider == "codebuddy-cn" {
+        ("CLI/2.108.1 CodeBuddy/2.108.1", "CLI")
     } else {
-        "IDE/2.108.1 CodeBuddy/2.108.1"
+        ("IDE/2.108.1 CodeBuddy/2.108.1", "IDE")
     };
     let headers = vec![
         ("authorization", format!("Bearer {token}")),
         ("user-agent", ua.to_string()),
         ("x-product", "SaaS".into()),
+        ("x-ide-type", ide.into()),
+        ("x-ide-name", ide.into()),
+        ("x-requested-with", "XMLHttpRequest".into()),
+        ("x-codebuddy-request", "1".into()),
     ];
     match post(
         client,
@@ -315,69 +340,178 @@ pub async fn codebuddy(
     .await
     {
         Err(e) => QuotaReport::err(conn_id, provider, e),
-        Ok(v) => {
-            let accounts = v
-                .pointer("/Response/Data/Accounts")
-                .or_else(|| v.pointer("/response/data/accounts"))
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default();
-            let mut windows = vec![];
-            for (i, acc) in accounts.iter().enumerate() {
-                let total = acc
-                    .get("TotalPrecise")
-                    .or_else(|| acc.get("Total"))
-                    .and_then(Value::as_f64)
-                    .unwrap_or(0.0);
-                let used_n = acc
-                    .get("UsedPrecise")
-                    .or_else(|| acc.get("Used"))
-                    .and_then(Value::as_f64)
-                    .unwrap_or(0.0);
-                if total <= 0.0 {
-                    continue;
-                }
-                let label = {
-                    let start = reset_of(acc, &["CycleStartTime"]);
-                    let end = reset_of(acc, &["CycleEndTime"]);
-                    match (start, end) {
-                        (Some(s), Some(e)) => {
-                            let days =
-                                (chrono::DateTime::parse_from_rfc3339(&e).ok().and_then(|e| {
-                                    chrono::DateTime::parse_from_rfc3339(&s)
-                                        .ok()
-                                        .map(|s| (e - s).num_days())
-                                }))
-                                .unwrap_or(30);
-                            if days <= 1 {
-                                "Daily".to_string()
-                            } else if days <= 10 {
-                                "Weekly".to_string()
-                            } else {
-                                "Monthly".to_string()
-                            }
-                        }
-                        _ => format!("Pack {}", i + 1),
-                    }
-                };
-                windows.push(QuotaWindow {
-                    label,
-                    used: (used_n / total * 100.0).clamp(0.0, 100.0),
-                    reset_at: reset_of(acc, &["CycleEndTime"]),
-                });
-            }
-            if windows.is_empty() {
-                return QuotaReport::err(conn_id, provider, "no accounts data");
-            }
-            QuotaReport {
-                connection_id: conn_id.into(),
-                provider: provider.into(),
-                plan: None,
-                windows,
-                error: None,
-                fetched_at: chrono::Utc::now().to_rfc3339(),
+        Ok(v) => parse_codebuddy(conn_id, provider, &v),
+    }
+}
+
+/// Parse the Tencent billing payload. Two credit types must NOT be merged:
+/// - refill/base packs: cycle resets long before the resource expires
+///   (DeductionEndTime - CycleEndTime > 2d) → *Cycle* fields, recurring.
+/// - bonus packs: one-shot credits (CycleEndTime == DeductionEndTime) → plain
+///   Capacity fields, non-recurring, resetAt = expiry.
+///
+/// Port of open-sse/services/usage/codebuddy-cn.js.
+fn parse_codebuddy(conn_id: &str, provider: &str, v: &Value) -> QuotaReport {
+    if v.get("code").and_then(Value::as_i64).unwrap_or(0) != 0 {
+        let msg = v
+            .get("msg")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_string();
+        return QuotaReport::err(conn_id, provider, format!("quota error: {msg}"));
+    }
+    let accounts = v
+        .pointer("/data/Response/Data/Accounts")
+        .or_else(|| v.pointer("/Data/Response/Data/Accounts"))
+        .or_else(|| v.pointer("/Response/Data/Accounts"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    if accounts.is_empty() {
+        return QuotaReport::err(conn_id, provider, "no credit package found");
+    }
+
+    const REFILL_GAP_MS: i64 = 2 * 24 * 60 * 60 * 1000;
+    let ts_ms = |x: &Value| -> Option<i64> {
+        if let Some(n) = x.as_i64() {
+            return Some(if n < 1_000_000_000_000 { n * 1000 } else { n });
+        }
+        x.as_str()
+            .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()))
+            .and_then(|s| s.parse::<i64>().ok())
+            .map(|n| if n < 1_000_000_000_000 { n * 1000 } else { n })
+    };
+    let cycle_end_ms = |acc: &Value| -> Option<i64> {
+        acc.get("CycleEndTime").and_then(ts_ms).or_else(|| {
+            // rfc3339 string
+            acc.get("CycleEndTime")
+                .and_then(Value::as_str)
+                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                .map(|t| t.timestamp_millis())
+        })
+    };
+    let is_refill = |acc: &Value| -> bool {
+        match (
+            cycle_end_ms(acc),
+            acc.get("DeductionEndTime").and_then(ts_ms),
+        ) {
+            (Some(ce), Some(de)) => de - ce > REFILL_GAP_MS,
+            _ => false,
+        }
+    };
+
+    let mut refills: Vec<&Value> = accounts.iter().filter(|a| is_refill(a)).collect();
+    let mut bonuses: Vec<&Value> = accounts.iter().filter(|a| !is_refill(a)).collect();
+    let by_expiry = |a: &&Value, b: &&Value| {
+        cycle_end_ms(a)
+            .unwrap_or(i64::MAX)
+            .cmp(&cycle_end_ms(b).unwrap_or(i64::MAX))
+    };
+    refills.sort_by(by_expiry);
+    bonuses.sort_by(by_expiry);
+
+    let num = |acc: &Value, precise: &str, plain: &str| -> f64 {
+        acc.get(precise)
+            .or_else(|| acc.get(plain))
+            .and_then(|x| x.as_f64().or_else(|| x.as_str()?.parse::<f64>().ok()))
+            .unwrap_or(0.0)
+    };
+
+    let mut windows = vec![];
+    let mut seen: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    for acc in &refills {
+        let base_label = cadence_label(acc);
+        let n = seen.entry(base_label.clone()).or_insert(0);
+        *n += 1;
+        let label = if *n > 1 {
+            format!("{base_label} {n}")
+        } else {
+            base_label
+        };
+        let used = num(acc, "CycleCapacityUsedPrecise", "CycleCapacityUsed");
+        let total = num(acc, "CycleCapacitySizePrecise", "CycleCapacitySize");
+        if total <= 0.0 {
+            continue;
+        }
+        windows.push(QuotaWindow {
+            label,
+            used: (used / total * 100.0).clamp(0.0, 100.0),
+            reset_at: reset_of(acc, &["CycleEndTime"]),
+            recurring: true,
+        });
+    }
+    for (i, acc) in bonuses.iter().enumerate() {
+        let used = num(acc, "CapacityUsedPrecise", "CapacityUsed");
+        let total = num(acc, "CapacitySizePrecise", "CapacitySize");
+        if total <= 0.0 {
+            continue;
+        }
+        windows.push(QuotaWindow {
+            label: format!("Bonus Pack {}", i + 1),
+            used: (used / total * 100.0).clamp(0.0, 100.0),
+            reset_at: reset_of(acc, &["CycleEndTime"]),
+            recurring: false,
+        });
+    }
+    if windows.is_empty() {
+        return QuotaReport::err(conn_id, provider, "no accounts data");
+    }
+
+    let default_name = if provider == "codebuddy-cn" {
+        "CodeBuddy CN"
+    } else {
+        "CodeBuddy"
+    };
+    let plan = refills
+        .first()
+        .copied()
+        .or_else(|| accounts.first())
+        .and_then(|acc| {
+            acc.get("PackageName")
+                .or_else(|| acc.get("SubProductName"))
+                .and_then(Value::as_str)
+        })
+        .unwrap_or(default_name)
+        .to_string();
+    QuotaReport {
+        connection_id: conn_id.into(),
+        provider: provider.into(),
+        plan: Some(plan),
+        windows,
+        error: None,
+        fetched_at: chrono::Utc::now().to_rfc3339(),
+    }
+}
+
+/// Cadence label from cycle length (Monthly is the common CodeBuddy case).
+fn cadence_label(acc: &Value) -> String {
+    let parse = |key: &str| {
+        acc.get(key).and_then(|x| {
+            x.as_str().and_then(|s| {
+                chrono::DateTime::parse_from_rfc3339(s)
+                    .ok()
+                    .or_else(|| {
+                        s.parse::<i64>().ok().and_then(|n| {
+                            let ms = if n < 1_000_000_000_000 { n * 1000 } else { n };
+                            chrono::DateTime::from_timestamp_millis(ms)
+                                .map(|t| t.fixed_offset())
+                        })
+                    })
+            })
+        })
+    };
+    match (parse("CycleStartTime"), parse("CycleEndTime")) {
+        (Some(s), Some(e)) => {
+            let days = (e - s).num_milliseconds() as f64 / 86_400_000.0;
+            if days <= 1.5 {
+                "Daily".to_string()
+            } else if days <= 10.0 {
+                "Weekly".to_string()
+            } else {
+                "Monthly".to_string()
             }
         }
+        _ => "Pack".to_string(),
     }
 }
 
@@ -401,12 +535,47 @@ mod tests {
     }
 
     #[test]
-    fn codebuddy_cadence_label() {
-        let acc = serde_json::json!({"TotalPrecise": 1000.0, "UsedPrecise": 250.0,
-            "CycleStartTime": "2026-08-01T00:00:00Z", "CycleEndTime": "2026-09-01T00:00:00Z"});
-        let total = acc.get("TotalPrecise").and_then(Value::as_f64).unwrap();
-        let used = acc.get("UsedPrecise").and_then(Value::as_f64).unwrap();
-        assert_eq!(used / total * 100.0, 25.0);
+    fn codebuddy_parse_fixture() {
+        // Refill: cycle ends 2026-09-01, resource expires 2027-08-01 (>2d gap) → Monthly recurring.
+        // Bonus: CycleEndTime == DeductionEndTime → non-recurring "Bonus Pack 1".
+        let v = serde_json::json!({
+            "code": 0,
+            "data": {"Response": {"Data": {"Accounts": [
+                {
+                    "PackageName": "基础体验包",
+                    "CycleStartTime": "2026-08-01T00:00:00Z",
+                    "CycleEndTime": "2026-09-01T00:00:00Z",
+                    "DeductionEndTime": 1_815_500_000_000i64,
+                    "CycleCapacityUsedPrecise": "6.54",
+                    "CycleCapacitySizePrecise": "500"
+                },
+                {
+                    "PackageName": "活动赠送包",
+                    "CycleStartTime": "2026-08-01T00:00:00Z",
+                    "CycleEndTime": 1_756_000_000i64,
+                    "DeductionEndTime": 1_756_000_000i64,
+                    "CapacityUsedPrecise": "10",
+                    "CapacitySizePrecise": "100"
+                }
+            ]}}}
+        });
+        let r = parse_codebuddy("c1", "codebuddy-cn", &v);
+        assert!(r.error.is_none(), "unexpected error: {:?}", r.error);
+        assert_eq!(r.plan.as_deref(), Some("基础体验包"));
+        assert_eq!(r.windows.len(), 2);
+        assert_eq!(r.windows[0].label, "Monthly");
+        assert!(r.windows[0].recurring);
+        assert!((r.windows[0].used - 1.308).abs() < 0.001);
+        assert_eq!(r.windows[1].label, "Bonus Pack 1");
+        assert!(!r.windows[1].recurring);
+        assert!((r.windows[1].used - 10.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn codebuddy_envelope_error() {
+        let v = serde_json::json!({"code": 40100, "msg": "invalid token"});
+        let r = parse_codebuddy("c1", "codebuddy-cn", &v);
+        assert_eq!(r.error.as_deref(), Some("quota error: invalid token"));
     }
 
     #[test]
