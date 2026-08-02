@@ -9,12 +9,12 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 use axum::Json;
 use bytes::Bytes;
-use ninty_core::error::Error;
-use ninty_core::registry::{self, AuthStyle, UrlStyle, WireFormat};
 use engine::executor::retry_config_for;
 use engine::fallback::{self, Verdict};
 use engine::sse::SseParser;
 use engine::translator::{self, Format};
+use ninty_core::error::Error;
+use ninty_core::registry::{self, AuthStyle, UrlStyle, WireFormat};
 use serde_json::{json, Value};
 
 use crate::api::ApiError;
@@ -33,7 +33,14 @@ pub async fn chat_completions(
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Result<Response, ApiError> {
-    run(State(state), headers, Json(body), WireFormat::Openai, "/v1/chat/completions").await
+    run(
+        State(state),
+        headers,
+        Json(body),
+        WireFormat::Openai,
+        "/v1/chat/completions",
+    )
+    .await
 }
 
 pub async fn messages(
@@ -41,7 +48,14 @@ pub async fn messages(
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Result<Response, ApiError> {
-    run(State(state), headers, Json(body), WireFormat::Claude, "/v1/messages").await
+    run(
+        State(state),
+        headers,
+        Json(body),
+        WireFormat::Claude,
+        "/v1/messages",
+    )
+    .await
 }
 
 fn to_format(f: WireFormat) -> Format {
@@ -65,7 +79,11 @@ pub(crate) async fn run(
     endpoint: &'static str,
 ) -> Result<Response, ApiError> {
     let stream = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
-    let model = body.get("model").and_then(Value::as_str).unwrap_or("").to_string();
+    let model = body
+        .get("model")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
     if model.is_empty() {
         return Err(Error::BadRequest("missing model".into()).into());
     }
@@ -87,10 +105,13 @@ pub(crate) async fn run(
             return Err(Error::Unauthorized.into());
         }
         if !key.allowed_models.is_empty() && !key.allowed_models.iter().any(|m| m == &model) {
-            return Err(Error::BadRequest(format!("model '{model}' not allowed for this key")).into());
+            return Err(
+                Error::BadRequest(format!("model '{model}' not allowed for this key")).into(),
+            );
         }
         if let Some(limit) = key.token_limit {
-            let used = usage::key_usage_since(&state.db, &key.key, key.limit_reset_at.clone()).await?;
+            let used =
+                usage::key_usage_since(&state.db, &key.key, key.limit_reset_at.clone()).await?;
             if used >= limit {
                 return Err(ApiError(Error::Upstream {
                     status: 429,
@@ -100,7 +121,19 @@ pub(crate) async fn run(
         }
         if let Some(rpm) = key.rpm_limit {
             if usage::rpm_count(&state.db, &key.key).await? >= rpm {
-                record(&state, "", &model, None, Some(&key.key), endpoint, 0, 0, "error", Some("rate_limit")).await;
+                record(
+                    &state,
+                    "",
+                    &model,
+                    None,
+                    Some(&key.key),
+                    endpoint,
+                    0,
+                    0,
+                    "error",
+                    Some("rate_limit"),
+                )
+                .await;
                 return Err(ApiError(Error::Upstream {
                     status: 429,
                     message: "rate limit exceeded".into(),
@@ -122,11 +155,25 @@ pub(crate) async fn run(
     let mut last_error: Option<(u16, String)> = None;
     while !specs.is_empty() {
         let spec = specs.remove(0);
-        match run_single(&state, &body, &spec, client_format, endpoint, stream, &key_str, &headers).await {
+        match run_single(
+            &state,
+            &body,
+            &spec,
+            client_format,
+            endpoint,
+            stream,
+            &key_str,
+            &headers,
+        )
+        .await
+        {
             Ok(resp) => return Ok(resp),
             Err((status, text, verdict)) => {
                 if verdict == Verdict::NoFallback || !combo_mode {
-                    return Err(ApiError(Error::Upstream { status, message: text }));
+                    return Err(ApiError(Error::Upstream {
+                        status,
+                        message: text,
+                    }));
                 }
                 last_error = Some((status, text));
             }
@@ -161,7 +208,17 @@ async fn run_single(
     for target in targets {
         // qoder: fully custom executor (COSY sign + model_config + envelope SSE)
         if target.provider_id == "qoder" {
-            match run_qoder(state, &target, body, client_format, endpoint, stream, key_str).await {
+            match run_qoder(
+                state,
+                &target,
+                body,
+                client_format,
+                endpoint,
+                stream,
+                key_str,
+            )
+            .await
+            {
                 Ok(resp) => return Ok(resp),
                 Err(e) => return Err(e),
             }
@@ -225,7 +282,19 @@ async fn run_single(
                     Verdict::NoFallback => return Err((status, text, verdict)),
                     _ => {
                         mark(state, &target, &text, &verdict).await;
-                        record(state, &target.provider_id, &target.model, target.conn_id.as_deref(), key_str.as_deref(), endpoint, 0, 0, "error", None).await;
+                        record(
+                            state,
+                            &target.provider_id,
+                            &target.model,
+                            target.conn_id.as_deref(),
+                            key_str.as_deref(),
+                            endpoint,
+                            0,
+                            0,
+                            "error",
+                            None,
+                        )
+                        .await;
                         last = Some((status, text));
                         continue;
                     }
@@ -249,8 +318,18 @@ async fn run_single(
                         if !cred.is_empty() {
                             let mut t2 = target.clone();
                             t2.credential = cred;
-                            if let Ok((url2, headers2)) = build_url_and_auth(state, &t2, stream).await {
-                                if let Ok(r2) = send_request(&state.http, &url2, &headers2, &body_out, t2.timeout_ms).await {
+                            if let Ok((url2, headers2)) =
+                                build_url_and_auth(state, &t2, stream).await
+                            {
+                                if let Ok(r2) = send_request(
+                                    &state.http,
+                                    &url2,
+                                    &headers2,
+                                    &body_out,
+                                    t2.timeout_ms,
+                                )
+                                .await
+                                {
                                     resp = r2;
                                 }
                             }
@@ -268,7 +347,19 @@ async fn run_single(
                 Verdict::NoFallback => return Err((status, text, verdict)),
                 _ => {
                     mark(state, &target, &text, &verdict).await;
-                    record(state, &target.provider_id, &target.model, target.conn_id.as_deref(), key_str.as_deref(), endpoint, 0, 0, "error", None).await;
+                    record(
+                        state,
+                        &target.provider_id,
+                        &target.model,
+                        target.conn_id.as_deref(),
+                        key_str.as_deref(),
+                        endpoint,
+                        0,
+                        0,
+                        "error",
+                        None,
+                    )
+                    .await;
                     last = Some((status, text));
                     continue;
                 }
@@ -280,7 +371,18 @@ async fn run_single(
             let sticky = sticky_limit(state, &target.provider_id).await;
             let _ = connections::clear_error(&state.db, conn_id, &target.model, sticky).await;
         }
-        return Ok(finish(state, target, body, client_format, endpoint, stream, key_str, rtk_saved, resp).await);
+        return Ok(finish(
+            state,
+            target,
+            body,
+            client_format,
+            endpoint,
+            stream,
+            key_str,
+            rtk_saved,
+            resp,
+        )
+        .await);
     }
 
     let (status, text) = last.unwrap_or((503, format!("no accounts available for '{spec}'")));
@@ -294,13 +396,16 @@ fn judge(text: &str, status: u16, backoff_level: u32) -> Verdict {
 }
 
 async fn mark(state: &Arc<AppState>, target: &Target, text: &str, verdict: &Verdict) {
-    let Some(conn_id) = &target.conn_id else { return };
+    let Some(conn_id) = &target.conn_id else {
+        return;
+    };
     let (ms, deactivate) = match verdict {
         Verdict::Fallback { cooldown_ms } => (*cooldown_ms, false),
         Verdict::Deactivate => (0, true),
         Verdict::NoFallback => return,
     };
-    let _ = connections::mark_unavailable(&state.db, conn_id, &target.model, ms, text, deactivate).await;
+    let _ = connections::mark_unavailable(&state.db, conn_id, &target.model, ms, text, deactivate)
+        .await;
 }
 
 // ---------------------------------------------------------------------------
@@ -327,7 +432,17 @@ async fn finish(
 
     if !stream && target.force_stream {
         // upstream streams, client wants a single JSON: collect + accumulate
-        return collect_forced_stream(state, target, client_format, endpoint, key_str, rtk_saved, &request_model, resp).await;
+        return collect_forced_stream(
+            state,
+            target,
+            client_format,
+            endpoint,
+            key_str,
+            rtk_saved,
+            &request_model,
+            resp,
+        )
+        .await;
     }
 
     if !stream {
@@ -341,11 +456,29 @@ async fn finish(
         let out = if target.format == client_format {
             parsed
         } else {
-            translator::translate_response_json(up_fmt, to_format(client_format), &parsed, &request_model)
-                .unwrap_or(parsed)
+            translator::translate_response_json(
+                up_fmt,
+                to_format(client_format),
+                &parsed,
+                &request_model,
+            )
+            .unwrap_or(parsed)
         };
         let (prompt, completion) = usage_of(client_format, &out);
-        record_meta(state, &target.provider_id, &request_model, target.conn_id.as_deref(), key_str.as_deref(), endpoint, prompt, completion, "success", None, rtk_saved).await;
+        record_meta(
+            state,
+            &target.provider_id,
+            &request_model,
+            target.conn_id.as_deref(),
+            key_str.as_deref(),
+            endpoint,
+            prompt,
+            completion,
+            "success",
+            None,
+            rtk_saved,
+        )
+        .await;
         return Json(out).into_response();
     }
 
@@ -371,7 +504,12 @@ async fn finish(
     let counted = CountingStream::new(rx, move |total_bytes| {
         let estimate = total_bytes / 4;
         let db = db.clone();
-        let (provider, conn_id, model, key) = (provider.clone(), conn_id.clone(), model.clone(), key.clone());
+        let (provider, conn_id, model, key) = (
+            provider.clone(),
+            conn_id.clone(),
+            model.clone(),
+            key.clone(),
+        );
         tokio::spawn(async move {
             let meta = (rtk_saved > 0).then(|| json!({"rtk_saved_bytes": rtk_saved}));
             let _ = usage::record(
@@ -429,7 +567,11 @@ async fn stream_pipeline<S, E>(
             Ok(Some(Err(_))) | Ok(None) => break,
             Err(_) => {
                 // stall: keep-alive comment
-                if tx.send(Ok(Bytes::from(": ninty-router idle\n\n"))).await.is_err() {
+                if tx
+                    .send(Ok(Bytes::from(": ninty-router idle\n\n")))
+                    .await
+                    .is_err()
+                {
                     return;
                 }
                 continue;
@@ -437,7 +579,16 @@ async fn stream_pipeline<S, E>(
         };
         for payload in parser.feed(&chunk) {
             if payload == "[DONE]" {
-                flush_all(&mut *stage1, &mut *stage2, up, cli, model, &tx, &mut flushed).await;
+                flush_all(
+                    &mut *stage1,
+                    &mut *stage2,
+                    up,
+                    cli,
+                    model,
+                    &tx,
+                    &mut flushed,
+                )
+                .await;
                 if cli == Format::Openai {
                     let _ = tx.send(Ok(Bytes::from("data: [DONE]\n\n"))).await;
                 }
@@ -452,7 +603,16 @@ async fn stream_pipeline<S, E>(
             }
         }
     }
-    flush_all(&mut *stage1, &mut *stage2, up, cli, model, &tx, &mut flushed).await;
+    flush_all(
+        &mut *stage1,
+        &mut *stage2,
+        up,
+        cli,
+        model,
+        &tx,
+        &mut flushed,
+    )
+    .await;
 }
 
 trait Stage: Send {
@@ -513,7 +673,9 @@ async fn emit_stage2(
     tx: &tokio::sync::mpsc::Sender<Result<Bytes, std::io::Error>>,
 ) {
     for ev in stage2.handle(mid) {
-        let _ = tx.send(Ok(Bytes::from(serialize_event(cli, &ev, model)))).await;
+        let _ = tx
+            .send(Ok(Bytes::from(serialize_event(cli, &ev, model))))
+            .await;
     }
 }
 
@@ -534,7 +696,9 @@ async fn flush_all(
         emit_stage2(&mid, stage2, cli, model, tx).await;
     }
     for ev in stage2.flush() {
-        let _ = tx.send(Ok(Bytes::from(serialize_event(cli, &ev, model)))).await;
+        let _ = tx
+            .send(Ok(Bytes::from(serialize_event(cli, &ev, model))))
+            .await;
     }
 }
 
@@ -587,7 +751,12 @@ async fn resolve_targets(
 ) -> ninty_core::error::Result<Vec<Target>> {
     let (prefix, model) = registry::resolve(spec)
         .map(|(p, m)| (Some(p), m))
-        .unwrap_or((None, spec.split_once('/').map(|(_, m)| m.to_string()).unwrap_or_default()));
+        .unwrap_or((
+            None,
+            spec.split_once('/')
+                .map(|(_, m)| m.to_string())
+                .unwrap_or_default(),
+        ));
     let prefix_str = spec.split('/').next().unwrap_or("");
 
     // custom node?
@@ -647,7 +816,11 @@ async fn resolve_targets(
             if !c.is_active {
                 return false;
             }
-            match c.data.get(format!("modelLock_{model}")).and_then(|v| v.as_str()) {
+            match c
+                .data
+                .get(format!("modelLock_{model}"))
+                .and_then(|v| v.as_str())
+            {
                 Some(lock) => chrono::DateTime::parse_from_rfc3339(lock)
                     .map(|t| t.with_timezone(&chrono::Utc) <= now)
                     .unwrap_or(true),
@@ -671,12 +844,20 @@ async fn resolve_targets(
             .unwrap_or(app_settings.sticky_round_robin_limit);
         conns.sort_by_key(|c| {
             (
-                c.data.get("lastUsedAt").and_then(|v| v.as_str()).map(String::from).unwrap_or_default(),
+                c.data
+                    .get("lastUsedAt")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+                    .unwrap_or_default(),
                 c.priority,
             )
         });
         if let Some(last) = conns.last() {
-            let count = last.data.get("consecutiveUseCount").and_then(|c| c.as_i64()).unwrap_or(0);
+            let count = last
+                .data
+                .get("consecutiveUseCount")
+                .and_then(|c| c.as_i64())
+                .unwrap_or(0);
             if count > 0 && (count as u32) < sticky {
                 let last = conns.pop().unwrap();
                 conns.insert(0, last);
@@ -710,7 +891,11 @@ async fn resolve_targets(
                     transport = *alt;
                 }
             }
-        } else if let Some(alt) = provider.alt_transports.iter().find(|t| t.format == client_format) {
+        } else if let Some(alt) = provider
+            .alt_transports
+            .iter()
+            .find(|t| t.format == client_format)
+        {
             transport = *alt;
         }
 
@@ -745,21 +930,63 @@ async fn resolve_targets(
             format: transport.format,
             auth: transport.auth,
             credential,
-            headers: transport.headers.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            headers: transport
+                .headers
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             model: upstream_model.clone(),
             timeout_ms: transport.timeout_ms,
             url_style: transport.url_style,
             url_suffix: transport.url_suffix.to_string(),
-            backoff_level: c.data.get("backoffLevel").and_then(|l| l.as_u64()).unwrap_or(0) as u32,
+            backoff_level: c
+                .data
+                .get("backoffLevel")
+                .and_then(|l| l.as_u64())
+                .unwrap_or(0) as u32,
             force_stream: transport.force_stream,
-            oauth_refresh: matches!(provider.id, "claude" | "codex" | "github" | "kiro" | "cline" | "codebuddy-cn" | "codebuddy-intl"),
+            oauth_refresh: matches!(
+                provider.id,
+                "claude"
+                    | "codex"
+                    | "github"
+                    | "kiro"
+                    | "cline"
+                    | "codebuddy-cn"
+                    | "codebuddy-intl"
+            ),
             qoder_creds: if provider.id == "qoder" {
                 Some(engine::qoder::CosyCreds {
-                    user_id: c.data.get("userId").and_then(|v| v.as_str()).unwrap_or("").into(),
-                    auth_token: c.data.get("accessToken").and_then(|v| v.as_str()).unwrap_or("").into(),
-                    name: c.data.get("name").and_then(|v| v.as_str()).unwrap_or("").into(),
-                    email: c.data.get("email").and_then(|v| v.as_str()).unwrap_or("").into(),
-                    machine_id: c.data.get("machineId").and_then(|v| v.as_str()).unwrap_or("").into(),
+                    user_id: c
+                        .data
+                        .get("userId")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    auth_token: c
+                        .data
+                        .get("accessToken")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    name: c
+                        .data
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    email: c
+                        .data
+                        .get("email")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    machine_id: c
+                        .data
+                        .get("machineId")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .into(),
                 })
             } else {
                 None
@@ -770,12 +997,22 @@ async fn resolve_targets(
                 .or_else(|| c.data.get("service_account_json"))
                 .and_then(|v| v.as_str())
                 .map(String::from),
-            vertex_project: c.data.get("project").and_then(|v| v.as_str()).map(String::from),
-            vertex_location: c.data.get("location").and_then(|v| v.as_str()).map(String::from),
+            vertex_project: c
+                .data
+                .get("project")
+                .and_then(|v| v.as_str())
+                .map(String::from),
+            vertex_location: c
+                .data
+                .get("location")
+                .and_then(|v| v.as_str())
+                .map(String::from),
         });
     }
     if targets.is_empty() {
-        return Err(Error::BadRequest(format!("no active accounts for '{spec}'")));
+        return Err(Error::BadRequest(format!(
+            "no active accounts for '{spec}'"
+        )));
     }
     Ok(targets)
 }
@@ -788,7 +1025,10 @@ async fn build_url_and_auth(
     let mut headers = target.headers.clone();
     if let Some(url) = &target.url_override {
         if !target.credential.is_empty() {
-            headers.push(("authorization".into(), format!("Bearer {}", target.credential)));
+            headers.push((
+                "authorization".into(),
+                format!("Bearer {}", target.credential),
+            ));
         }
         return Ok((url.clone(), headers));
     }
@@ -803,10 +1043,9 @@ async fn build_url_and_auth(
     let mut credential = target.credential.clone();
     let url = match target.url_style {
         UrlStyle::VertexModelAction => {
-            let sa = target
-                .vertex_sa
-                .as_deref()
-                .ok_or_else(|| Error::BadRequest("vertex connection missing serviceAccountJson".into()))?;
+            let sa = target.vertex_sa.as_deref().ok_or_else(|| {
+                Error::BadRequest("vertex connection missing serviceAccountJson".into())
+            })?;
             credential = engine::oauth::vertex::mint_access_token(&state.http, sa).await?;
             let project = target.vertex_project.as_deref().unwrap_or("");
             let location = target.vertex_location.as_deref().unwrap_or("global");
@@ -836,7 +1075,10 @@ async fn build_url_and_auth(
     if target.provider_id == "cline" {
         headers.extend([
             ("x-platform".into(), std::env::consts::OS.into()),
-            ("x-platform-version".into(), env!("CARGO_PKG_VERSION").into()),
+            (
+                "x-platform-version".into(),
+                env!("CARGO_PKG_VERSION").into(),
+            ),
             ("x-client-type".into(), "9router".into()),
             ("x-client-version".into(), env!("CARGO_PKG_VERSION").into()),
             ("x-core-version".into(), env!("CARGO_PKG_VERSION").into()),
@@ -879,7 +1121,9 @@ async fn send_request(
     loop {
         let mut req = client
             .post(url)
-            .timeout(std::time::Duration::from_millis(FIRST_BYTE_MS.max(timeout_ms)))
+            .timeout(std::time::Duration::from_millis(
+                FIRST_BYTE_MS.max(timeout_ms),
+            ))
             .header("content-type", "application/json");
         for (k, v) in headers {
             req = req.header(k, v);
@@ -913,13 +1157,23 @@ async fn send_request(
 // ---------------------------------------------------------------------------
 
 fn inject_claude_identity(body: &mut Value) {
-    let mut system = body.get("system").and_then(|s| s.as_array()).cloned().unwrap_or_default();
+    let mut system = body
+        .get("system")
+        .and_then(|s| s.as_array())
+        .cloned()
+        .unwrap_or_default();
     let already = system.iter().any(|b| {
         b.get("type").and_then(|t| t.as_str()) == Some("text")
-            && b.get("text").and_then(|t| t.as_str()).map(|t| t.starts_with("You are Claude Code")).unwrap_or(false)
+            && b.get("text")
+                .and_then(|t| t.as_str())
+                .map(|t| t.starts_with("You are Claude Code"))
+                .unwrap_or(false)
     });
     if !already {
-        system.insert(0, json!({"type": "text", "text": "You are Claude Code, Anthropic's official CLI."}));
+        system.insert(
+            0,
+            json!({"type": "text", "text": "You are Claude Code, Anthropic's official CLI."}),
+        );
     }
     if !system.is_empty() {
         body["system"] = Value::Array(system);
@@ -928,19 +1182,29 @@ fn inject_claude_identity(body: &mut Value) {
 
 /// Combo capability reorder: image/pdf in last user message → vision-capable models first.
 fn reorder_by_capability(models: Vec<String>, body: &Value) -> Vec<String> {
-    const VISION_PREFIXES: &[&str] = &["anthropic/", "claude/", "openai/", "gemini/", "vertex/", "vx/"];
+    const VISION_PREFIXES: &[&str] = &[
+        "anthropic/",
+        "claude/",
+        "openai/",
+        "gemini/",
+        "vertex/",
+        "vx/",
+    ];
     let needs_vision = body
         .get("messages")
         .and_then(|m| m.as_array())
         .map(|msgs| {
             msgs.iter().rev().any(|m| {
                 m.get("role").and_then(|r| r.as_str()) == Some("user")
-                    && m.get("content").and_then(|c| c.as_array()).map(|parts| {
-                        parts.iter().any(|p| {
-                            let t = p.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                            t.contains("image") || t.contains("pdf") || t.contains("document")
+                    && m.get("content")
+                        .and_then(|c| c.as_array())
+                        .map(|parts| {
+                            parts.iter().any(|p| {
+                                let t = p.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                                t.contains("image") || t.contains("pdf") || t.contains("document")
+                            })
                         })
-                    }).unwrap_or(false)
+                        .unwrap_or(false)
             })
         })
         .unwrap_or(false);
@@ -963,16 +1227,28 @@ fn usage_of(format: WireFormat, body: &Value) -> (i64, i64) {
     let u = body.get("usage");
     match format {
         WireFormat::Claude => (
-            u.and_then(|u| u.get("input_tokens")).and_then(Value::as_i64).unwrap_or(0),
-            u.and_then(|u| u.get("output_tokens")).and_then(Value::as_i64).unwrap_or(0),
+            u.and_then(|u| u.get("input_tokens"))
+                .and_then(Value::as_i64)
+                .unwrap_or(0),
+            u.and_then(|u| u.get("output_tokens"))
+                .and_then(Value::as_i64)
+                .unwrap_or(0),
         ),
         WireFormat::Gemini => (
-            u.and_then(|u| u.get("promptTokenCount")).and_then(Value::as_i64).unwrap_or(0),
-            u.and_then(|u| u.get("candidatesTokenCount")).and_then(Value::as_i64).unwrap_or(0),
+            u.and_then(|u| u.get("promptTokenCount"))
+                .and_then(Value::as_i64)
+                .unwrap_or(0),
+            u.and_then(|u| u.get("candidatesTokenCount"))
+                .and_then(Value::as_i64)
+                .unwrap_or(0),
         ),
         WireFormat::Openai | WireFormat::Responses => (
-            u.and_then(|u| u.get("prompt_tokens")).and_then(Value::as_i64).unwrap_or(0),
-            u.and_then(|u| u.get("completion_tokens")).and_then(Value::as_i64).unwrap_or(0),
+            u.and_then(|u| u.get("prompt_tokens"))
+                .and_then(Value::as_i64)
+                .unwrap_or(0),
+            u.and_then(|u| u.get("completion_tokens"))
+                .and_then(Value::as_i64)
+                .unwrap_or(0),
         ),
     }
 }
@@ -1090,7 +1366,11 @@ struct CountingStream<F: FnMut(u64)> {
 
 impl<F: FnMut(u64)> CountingStream<F> {
     fn new(rx: tokio::sync::mpsc::Receiver<Result<Bytes, std::io::Error>>, on_end: F) -> Self {
-        Self { rx, total: 0, on_end: Some(on_end) }
+        Self {
+            rx,
+            total: 0,
+            on_end: Some(on_end),
+        }
     }
 }
 
@@ -1121,7 +1401,6 @@ impl<F: FnMut(u64) + Unpin> futures::Stream for CountingStream<F> {
 
 use axum::response::IntoResponse;
 
-
 /// Buffer a forced-stream upstream into one non-streaming client response.
 #[allow(clippy::too_many_arguments)]
 async fn collect_forced_stream(
@@ -1147,14 +1426,24 @@ async fn collect_forced_stream(
             if payload == "[DONE]" {
                 break;
             }
-            let Ok(ev) = serde_json::from_str::<Value>(&payload) else { continue };
+            let Ok(ev) = serde_json::from_str::<Value>(&payload) else {
+                continue;
+            };
             for out in acc.handle(&ev) {
                 if let Some(u) = out.get("usage") {
                     let p = u.get("prompt_tokens").and_then(Value::as_i64).unwrap_or(0);
-                    let c = u.get("completion_tokens").and_then(Value::as_i64).unwrap_or(0);
+                    let c = u
+                        .get("completion_tokens")
+                        .and_then(Value::as_i64)
+                        .unwrap_or(0);
                     usage = Some((p, c));
                 }
-                if let Some(delta) = out.get("choices").and_then(|c| c.as_array()).and_then(|a| a.first()).and_then(|c| c.get("delta")) {
+                if let Some(delta) = out
+                    .get("choices")
+                    .and_then(|c| c.as_array())
+                    .and_then(|a| a.first())
+                    .and_then(|c| c.get("delta"))
+                {
                     if let Some(t) = delta.get("content").and_then(Value::as_str) {
                         text.push_str(t);
                     }
@@ -1180,7 +1469,20 @@ async fn collect_forced_stream(
         WireFormat::Openai | WireFormat::Responses => openai,
         f => translator::from_openai_json(to_format(f), &openai, request_model).unwrap_or(openai),
     };
-    record_meta(state, &target.provider_id, request_model, target.conn_id.as_deref(), key_str.as_deref(), endpoint, p, c, "success", None, rtk_saved).await;
+    record_meta(
+        state,
+        &target.provider_id,
+        request_model,
+        target.conn_id.as_deref(),
+        key_str.as_deref(),
+        endpoint,
+        p,
+        c,
+        "success",
+        None,
+        rtk_saved,
+    )
+    .await;
     Json(out).into_response()
 }
 
@@ -1202,17 +1504,27 @@ async fn run_qoder(
         .qoder_creds
         .clone()
         .filter(|c| !c.user_id.is_empty() && !c.auth_token.is_empty())
-        .ok_or((400, "qoder connection missing userId/accessToken — reconnect".into(), Verdict::NoFallback))?;
+        .ok_or((
+            400,
+            "qoder connection missing userId/accessToken — reconnect".into(),
+            Verdict::NoFallback,
+        ))?;
 
     // model_config: kv cache per conn+model, else live fetch
-    let cache_key = format!("qoder-mc:{}:{}", target.conn_id.as_deref().unwrap_or(""), target.model);
+    let cache_key = format!(
+        "qoder-mc:{}:{}",
+        target.conn_id.as_deref().unwrap_or(""),
+        target.model
+    );
     let cached: Option<Value> = state
         .db
         .call({
             let k = cache_key.clone();
             move |conn| {
                 Ok(conn
-                    .query_row("SELECT value FROM kv WHERE key = ?1", [&k], |r| r.get::<_, String>(0))
+                    .query_row("SELECT value FROM kv WHERE key = ?1", [&k], |r| {
+                        r.get::<_, String>(0)
+                    })
                     .ok()
                     .and_then(|raw| serde_json::from_str(&raw).ok()))
             }
@@ -1225,7 +1537,15 @@ async fn run_qoder(
         None => {
             let v = engine::qoder::fetch_model_config(&state.http, &creds, &target.model)
                 .await
-                .map_err(|e| (502, e.to_string(), Verdict::Fallback { cooldown_ms: 30_000 }))?;
+                .map_err(|e| {
+                    (
+                        502,
+                        e.to_string(),
+                        Verdict::Fallback {
+                            cooldown_ms: 30_000,
+                        },
+                    )
+                })?;
             let (k, raw) = (cache_key.clone(), v.to_string());
             let _ = state
                 .db
@@ -1250,14 +1570,30 @@ async fn run_qoder(
         openai_body = translator::to_openai_request(to_format(client_format), &openai_body)
             .map_err(|e| (500, e.to_string(), Verdict::NoFallback))?;
     }
-    let qoder_body = engine::qoder::build_chat_body(&target.model, &openai_body, &model_config, &creds.user_id);
+    let qoder_body =
+        engine::qoder::build_chat_body(&target.model, &openai_body, &model_config, &creds.user_id);
     let body_bytes = qoder_body.to_string();
-    let headers = engine::qoder::build_cosy_headers(body_bytes.as_bytes(), engine::qoder::CHAT_URL, &creds)
-        .map_err(|e| (500, e.to_string(), Verdict::NoFallback))?;
+    let headers =
+        engine::qoder::build_cosy_headers(body_bytes.as_bytes(), engine::qoder::CHAT_URL, &creds)
+            .map_err(|e| (500, e.to_string(), Verdict::NoFallback))?;
 
-    let resp = send_request(&state.http, engine::qoder::CHAT_URL, &headers, &qoder_body, 120_000)
-        .await
-        .map_err(|(st, tx)| (st, tx, Verdict::Fallback { cooldown_ms: 30_000 }))?;
+    let resp = send_request(
+        &state.http,
+        engine::qoder::CHAT_URL,
+        &headers,
+        &qoder_body,
+        120_000,
+    )
+    .await
+    .map_err(|(st, tx)| {
+        (
+            st,
+            tx,
+            Verdict::Fallback {
+                cooldown_ms: 30_000,
+            },
+        )
+    })?;
     if !resp.status().is_success() {
         let status = resp.status().as_u16();
         let text = resp.text().await.unwrap_or_default();
@@ -1275,7 +1611,16 @@ async fn run_qoder(
 
     if !stream {
         // collect into single JSON (reuse openai accumulator via stage1 Identity)
-        return collect_qoder(state, target, client_format, endpoint, key_str, &request_model, unwrapped).await;
+        return collect_qoder(
+            state,
+            target,
+            client_format,
+            endpoint,
+            key_str,
+            &request_model,
+            unwrapped,
+        )
+        .await;
     }
 
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<Bytes, std::io::Error>>(64);
@@ -1294,7 +1639,12 @@ async fn run_qoder(
     let counted = CountingStream::new(rx, move |total| {
         let est = (total / 4) as i64;
         let db = db.clone();
-        let (provider, conn_id, model, key) = (provider.clone(), conn_id.clone(), model.clone(), key.clone());
+        let (provider, conn_id, model, key) = (
+            provider.clone(),
+            conn_id.clone(),
+            model.clone(),
+            key.clone(),
+        );
         tokio::spawn(async move {
             let _ = usage::record(
                 &db,
@@ -1369,7 +1719,8 @@ where
                                 self.done = true;
                                 break;
                             }
-                            self.queue.push_back(Bytes::from(format!("data: {inner}\n\n")));
+                            self.queue
+                                .push_back(Bytes::from(format!("data: {inner}\n\n")));
                         }
                     }
                 }
@@ -1408,11 +1759,15 @@ async fn collect_qoder(
             if payload == "[DONE]" {
                 break;
             }
-            let Ok(ev) = serde_json::from_str::<Value>(&payload) else { continue };
+            let Ok(ev) = serde_json::from_str::<Value>(&payload) else {
+                continue;
+            };
             if let Some(u) = ev.get("usage") {
                 usage_pair = (
                     u.get("prompt_tokens").and_then(Value::as_i64).unwrap_or(0),
-                    u.get("completion_tokens").and_then(Value::as_i64).unwrap_or(0),
+                    u.get("completion_tokens")
+                        .and_then(Value::as_i64)
+                        .unwrap_or(0),
                 );
             }
             if let Some(t) = ev

@@ -1,9 +1,9 @@
 mod auth_routes;
 mod combos;
-mod oauth;
-mod quota;
 mod keys;
+mod oauth;
 mod providers;
+mod quota;
 mod settings_routes;
 
 use std::sync::Arc;
@@ -33,7 +33,10 @@ pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .nest("/api", api)
         .nest("/v1", crate::v1::router())
-        .route("/v1beta/models/{*path}", axum::routing::post(crate::v1::v1beta::models_action))
+        .route(
+            "/v1beta/models/{*path}",
+            axum::routing::post(crate::v1::v1beta::models_action),
+        )
         .with_state(state)
 }
 

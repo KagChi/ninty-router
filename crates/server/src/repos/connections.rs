@@ -292,11 +292,21 @@ pub async fn clear_error(db: &Db, id: &str, model: &str, sticky_limit: u32) -> R
     db.call(move |conn| {
         let now = Utc::now();
         let current: String = conn
-            .query_row("SELECT data FROM provider_connections WHERE id = ?1", [&id_owned], |r| r.get(0))
+            .query_row(
+                "SELECT data FROM provider_connections WHERE id = ?1",
+                [&id_owned],
+                |r| r.get(0),
+            )
             .map_err(|e| Error::Db(e.to_string()))?;
         let mut data: serde_json::Value = serde_json::from_str(&current)?;
-        let last_used = data.get("lastUsedAt").and_then(|v| v.as_str()).map(String::from);
-        let sticky = data.get("consecutiveUseCount").and_then(|c| c.as_i64()).unwrap_or(0);
+        let last_used = data
+            .get("lastUsedAt")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let sticky = data
+            .get("consecutiveUseCount")
+            .and_then(|c| c.as_i64())
+            .unwrap_or(0);
         if let Some(obj) = data.as_object_mut() {
             obj.remove(&format!("modelLock_{model}"));
             obj.insert("backoffLevel".into(), serde_json::json!(0));
@@ -308,8 +318,18 @@ pub async fn clear_error(db: &Db, id: &str, model: &str, sticky_limit: u32) -> R
                 .map(|t| (now - t.with_timezone(&Utc)).num_minutes() < 30)
                 .unwrap_or(false);
             let count = if just_used { sticky + 1 } else { 1 };
-            obj.insert("consecutiveUseCount".into(), serde_json::json!(if (count as u32) < sticky_limit { count } else { 0 }));
-            obj.insert("lastUsedAt".into(), serde_json::Value::String(now.to_rfc3339()));
+            obj.insert(
+                "consecutiveUseCount".into(),
+                serde_json::json!(if (count as u32) < sticky_limit {
+                    count
+                } else {
+                    0
+                }),
+            );
+            obj.insert(
+                "lastUsedAt".into(),
+                serde_json::Value::String(now.to_rfc3339()),
+            );
         }
         let data_str = serde_json::to_string(&data)?;
         conn.execute(

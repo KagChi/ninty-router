@@ -299,10 +299,12 @@ pub static PROVIDERS: &[ProviderDef] = &[
     },
 ];
 
-
 const CLAUDE_API_HEADERS: &[(&str, &str)] = &[
     ("Anthropic-Version", "2023-06-01"),
-    ("Anthropic-Beta", "claude-code-20250219,interleaved-thinking-2025-05-14"),
+    (
+        "Anthropic-Beta",
+        "claude-code-20250219,interleaved-thinking-2025-05-14",
+    ),
 ];
 
 static GLM_ALT: &[Transport] = &[t("https://api.z.ai/api/coding/paas/v4/chat/completions")];
@@ -321,7 +323,10 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         transport: Transport {
             headers: &[
                 ("anthropic-version", "2023-06-01"),
-                ("anthropic-beta", "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14"),
+                (
+                    "anthropic-beta",
+                    "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14",
+                ),
                 ("anthropic-dangerous-direct-browser-access", "true"),
                 ("user-agent", "claude-cli/2.1.92 (external, sdk-cli)"),
                 ("x-app", "cli"),
@@ -409,10 +414,7 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         display_name: "Cline",
         notice_url: Some("https://cline.bot"),
         transport: Transport {
-            headers: &[
-                ("http-referer", "https://cline.bot"),
-                ("x-title", "Cline"),
-            ],
+            headers: &[("http-referer", "https://cline.bot"), ("x-title", "Cline")],
             ..t("https://api.cline.bot/api/v1/chat/completions")
         },
         alt_transports: &[],
@@ -424,7 +426,10 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
             m("openai/gpt-5.3-codex", "GPT-5.3 Codex"),
             m("openai/gpt-5.4", "GPT-5.4"),
             m("google/gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
-            m("google/gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite"),
+            m(
+                "google/gemini-3.1-flash-lite-preview",
+                "Gemini 3.1 Flash Lite",
+            ),
             m("kwaipilot/kat-coder-pro", "KAT Coder Pro"),
         ],
     },
@@ -694,7 +699,10 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
 
 /// All built-in providers (core + extra).
 pub fn all_providers() -> impl Iterator<Item = &'static ProviderDef> {
-    PROVIDERS.iter().chain(OAUTH_PROVIDERS.iter()).chain(EXTRA_PROVIDERS.iter())
+    PROVIDERS
+        .iter()
+        .chain(OAUTH_PROVIDERS.iter())
+        .chain(EXTRA_PROVIDERS.iter())
 }
 
 /// Find a provider by id or alias.

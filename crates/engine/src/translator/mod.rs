@@ -25,7 +25,7 @@ impl Format {
             Format::Openai => "openai",
             Format::Claude => "claude",
             Format::Gemini => "gemini",
-        Format::Responses => "responses",
+            Format::Responses => "responses",
         }
     }
 }

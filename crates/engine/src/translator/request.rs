@@ -95,7 +95,11 @@ pub fn openai_to_claude(body: &Value) -> ninty_core::error::Result<Value> {
             continue;
         }
         let (blocks, has_tool_use, has_tool_result) = openai_msg_to_claude_blocks(msg);
-        let new_role = if role == "assistant" { "assistant" } else { "user" };
+        let new_role = if role == "assistant" {
+            "assistant"
+        } else {
+            "user"
+        };
 
         if has_tool_result {
             flush(&mut out_messages, &mut cur_role, &mut cur_parts);
@@ -247,7 +251,11 @@ fn openai_msg_to_claude_blocks(msg: &Value) -> (Vec<Value>, bool, bool) {
                                 "tool_use_id": part.get("tool_use_id").cloned().unwrap_or(Value::Null),
                                 "content": part.get("content").cloned().unwrap_or(Value::Null),
                             });
-                            if part.get("is_error").and_then(|e| e.as_bool()).unwrap_or(false) {
+                            if part
+                                .get("is_error")
+                                .and_then(|e| e.as_bool())
+                                .unwrap_or(false)
+                            {
                                 b["is_error"] = Value::Bool(true);
                             }
                             blocks.push(b);
@@ -263,7 +271,8 @@ fn openai_msg_to_claude_blocks(msg: &Value) -> (Vec<Value>, bool, bool) {
                                         "type": "image",
                                         "source": {"type": "base64", "media_type": mime, "data": b64}
                                     }));
-                                } else if url.starts_with("http://") || url.starts_with("https://") {
+                                } else if url.starts_with("http://") || url.starts_with("https://")
+                                {
                                     blocks.push(json!({
                                         "type": "image",
                                         "source": {"type": "url", "url": url}
@@ -406,7 +415,12 @@ pub fn claude_to_openai(body: &Value) -> ninty_core::error::Result<Value> {
         "model": body.get("model").cloned().unwrap_or(Value::Null),
         "messages": out_messages,
     });
-    if body.get("max_tokens").and_then(|m| m.as_i64()).filter(|v| *v > 0).is_some() {
+    if body
+        .get("max_tokens")
+        .and_then(|m| m.as_i64())
+        .filter(|v| *v > 0)
+        .is_some()
+    {
         out["max_tokens"] = json!(adjust_max_tokens(body, DEFAULT_MAX_TOKENS));
     }
     if let Some(t) = body.get("temperature") {
@@ -502,7 +516,11 @@ fn claude_msg_to_openai(msg: &Value) -> ClaudeMsgOut {
         }));
     }
 
-    let eff_role = if role == "assistant" { "assistant" } else { "user" };
+    let eff_role = if role == "assistant" {
+        "assistant"
+    } else {
+        "user"
+    };
 
     match &content {
         Value::String(_) => ClaudeMsgOut::One(json!({"role": eff_role, "content": content})),
@@ -518,7 +536,8 @@ fn claude_msg_to_openai(msg: &Value) -> ClaudeMsgOut {
                     Some("image") => {
                         if let Some(src) = block.get("source") {
                             if src.get("type").and_then(|t| t.as_str()) == Some("base64") {
-                                let mime = src.get("media_type").and_then(|m| m.as_str()).unwrap_or("");
+                                let mime =
+                                    src.get("media_type").and_then(|m| m.as_str()).unwrap_or("");
                                 let data = src.get("data").and_then(|d| d.as_str()).unwrap_or("");
                                 parts.push(json!({
                                     "type": "image_url",
@@ -556,7 +575,9 @@ fn claude_msg_to_openai(msg: &Value) -> ClaudeMsgOut {
                                 }
                             }
                             Value::Null => Value::String(String::new()),
-                            other => Value::String(serde_json::to_string(other).unwrap_or_default()),
+                            other => {
+                                Value::String(serde_json::to_string(other).unwrap_or_default())
+                            }
                         };
                         tool_results.push(json!({
                             "role": "tool",
@@ -583,7 +604,9 @@ fn claude_msg_to_openai(msg: &Value) -> ClaudeMsgOut {
                 return ClaudeMsgOut::One(m);
             }
             if !parts.is_empty() {
-                return ClaudeMsgOut::One(json!({"role": eff_role, "content": collapse_text_parts(parts)}));
+                return ClaudeMsgOut::One(
+                    json!({"role": eff_role, "content": collapse_text_parts(parts)}),
+                );
             }
             if blocks.is_empty() {
                 return ClaudeMsgOut::One(json!({"role": eff_role, "content": ""}));

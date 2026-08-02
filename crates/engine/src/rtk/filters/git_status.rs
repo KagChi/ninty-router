@@ -13,7 +13,8 @@ pub fn git_status(input: &str) -> String {
 
     let re_branch = Regex::new(r"^On branch (\S+)").unwrap();
     let re_porcelain = Regex::new(r"^[ MADRCU?!][ MADRCU?!] ").unwrap();
-    let re_long = Regex::new(r"^\s*(modified|new file|deleted|renamed|both modified):\s+(.+)$").unwrap();
+    let re_long =
+        Regex::new(r"^\s*(modified|new file|deleted|renamed|both modified):\s+(.+)$").unwrap();
 
     let mut branch = String::new();
     let mut staged_files: Vec<String> = vec![];
@@ -89,9 +90,27 @@ pub fn git_status(input: &str) -> String {
             }
         }
     };
-    section(&mut out, "+ Staged", staged, &staged_files, STATUS_MAX_FILES);
-    section(&mut out, "~ Modified", modified, &modified_files, STATUS_MAX_FILES);
-    section(&mut out, "? Untracked", untracked, &untracked_files, STATUS_MAX_UNTRACKED);
+    section(
+        &mut out,
+        "+ Staged",
+        staged,
+        &staged_files,
+        STATUS_MAX_FILES,
+    );
+    section(
+        &mut out,
+        "~ Modified",
+        modified,
+        &modified_files,
+        STATUS_MAX_FILES,
+    );
+    section(
+        &mut out,
+        "? Untracked",
+        untracked,
+        &untracked_files,
+        STATUS_MAX_UNTRACKED,
+    );
     if conflicts > 0 {
         out += &format!("conflicts: {conflicts} files\n");
     }

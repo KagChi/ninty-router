@@ -64,7 +64,9 @@ pub fn classify(status: u16, body_text: &str, backoff_level: u32) -> Verdict {
     if matches!(status, 400 | 422) {
         return Verdict::NoFallback;
     }
-    Verdict::Fallback { cooldown_ms: 30_000 }
+    Verdict::Fallback {
+        cooldown_ms: 30_000,
+    }
 }
 
 /// Provider-reported reset time (e.g. codex usage_limit) overrides, capped 30min.
@@ -110,11 +112,15 @@ mod tests {
     fn rules() {
         assert_eq!(
             classify(401, "", 0),
-            Verdict::Fallback { cooldown_ms: 120_000 }
+            Verdict::Fallback {
+                cooldown_ms: 120_000
+            }
         );
         assert_eq!(
             classify(200, "no credentials found", 0),
-            Verdict::Fallback { cooldown_ms: 120_000 }
+            Verdict::Fallback {
+                cooldown_ms: 120_000
+            }
         );
         assert_eq!(
             classify(200, "request not allowed", 0),
@@ -126,24 +132,38 @@ mod tests {
         );
         assert_eq!(
             classify(429, "", 2),
-            Verdict::Fallback { cooldown_ms: 16_000 }
+            Verdict::Fallback {
+                cooldown_ms: 16_000
+            }
         );
         assert_eq!(
             classify(429, "", 14),
-            Verdict::Fallback { cooldown_ms: 300_000 } // capped 5min
+            Verdict::Fallback {
+                cooldown_ms: 300_000
+            } // capped 5min
         );
         assert_eq!(classify(400, "bad request", 0), Verdict::NoFallback);
         assert_eq!(classify(422, "", 0), Verdict::NoFallback);
         assert_eq!(
             classify(500, "", 0),
-            Verdict::Fallback { cooldown_ms: 30_000 }
+            Verdict::Fallback {
+                cooldown_ms: 30_000
+            }
         );
-        assert_eq!(classify(200, "error 14018 积分不足", 0), Verdict::Deactivate);
+        assert_eq!(
+            classify(200, "error 14018 积分不足", 0),
+            Verdict::Deactivate
+        );
     }
 
     #[test]
     fn resets_at_capped() {
         let v = with_resets_at(Verdict::Fallback { cooldown_ms: 5_000 }, Some(999_999_999));
-        assert_eq!(v, Verdict::Fallback { cooldown_ms: MAX_RATE_LIMIT_COOLDOWN_MS });
+        assert_eq!(
+            v,
+            Verdict::Fallback {
+                cooldown_ms: MAX_RATE_LIMIT_COOLDOWN_MS
+            }
+        );
     }
 }

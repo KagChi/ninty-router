@@ -9,8 +9,15 @@ pub fn read_numbered(input: &str) -> String {
         return input.to_string();
     }
     let cut = lines.len() - SMART_TRUNCATE_HEAD - SMART_TRUNCATE_TAIL;
-    let mut out: Vec<String> = lines[..SMART_TRUNCATE_HEAD].iter().map(|s| s.to_string()).collect();
+    let mut out: Vec<String> = lines[..SMART_TRUNCATE_HEAD]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     out.push(format!("... +{cut} lines truncated (file continues)"));
-    out.extend(lines[lines.len() - SMART_TRUNCATE_TAIL..].iter().map(|s| s.to_string()));
+    out.extend(
+        lines[lines.len() - SMART_TRUNCATE_TAIL..]
+            .iter()
+            .map(|s| s.to_string()),
+    );
     out.join("\n")
 }

@@ -7,7 +7,10 @@ const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01
 fn rand_bytes(n: usize) -> Vec<u8> {
     use std::time::{SystemTime, UNIX_EPOCH};
     // xorshift seeded from nanos + pid — sufficient for PKCE/state (not long-term keys)
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
     let mut x: u128 = nanos ^ ((std::process::id() as u128) << 64) ^ 0x9E3779B97F4A7C15;
     (0..n)
         .map(|_| {
@@ -25,7 +28,10 @@ fn b64url(data: &[u8]) -> String {
 }
 
 pub fn generate_verifier() -> String {
-    rand_bytes(48).iter().map(|b| ALPHABET[(*b as usize) % ALPHABET.len()] as char).collect()
+    rand_bytes(48)
+        .iter()
+        .map(|b| ALPHABET[(*b as usize) % ALPHABET.len()] as char)
+        .collect()
 }
 
 pub fn challenge_s256(verifier: &str) -> String {

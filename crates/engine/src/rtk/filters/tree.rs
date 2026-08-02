@@ -13,12 +13,19 @@ pub fn tree(input: &str) -> String {
         }
         filtered.push(line);
     }
-    while filtered.last().map(|l| l.trim().is_empty()).unwrap_or(false) {
+    while filtered
+        .last()
+        .map(|l| l.trim().is_empty())
+        .unwrap_or(false)
+    {
         filtered.pop();
     }
     if filtered.len() > TREE_MAX_LINES {
         let cut = filtered.len() - TREE_MAX_LINES;
-        return format!("{}\n... +{cut} more lines", filtered[..TREE_MAX_LINES].join("\n"));
+        return format!(
+            "{}\n... +{cut} more lines",
+            filtered[..TREE_MAX_LINES].join("\n")
+        );
     }
     filtered.join("\n")
 }

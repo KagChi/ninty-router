@@ -9,7 +9,12 @@ pub fn openai_to_responses(body: &Value) -> ninty_core::error::Result<Value> {
     let mut input: Vec<Value> = vec![];
     let mut instructions: Option<String> = None;
 
-    for m in body.get("messages").and_then(Value::as_array).cloned().unwrap_or_default() {
+    for m in body
+        .get("messages")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+    {
         let role = m.get("role").and_then(Value::as_str).unwrap_or("user");
         match role {
             "system" | "developer" => {
@@ -39,7 +44,11 @@ pub fn openai_to_responses(body: &Value) -> ninty_core::error::Result<Value> {
                         }));
                     }
                 }
-                let part_type = if role == "assistant" { "output_text" } else { "input_text" };
+                let part_type = if role == "assistant" {
+                    "output_text"
+                } else {
+                    "input_text"
+                };
                 input.push(json!({
                     "type": "message",
                     "role": role,
@@ -208,10 +217,15 @@ impl ResponsesToOpenAI {
             "response.completed" => {
                 if let Some(u) = event.get("response").and_then(|r| r.get("usage")) {
                     self.input_tokens = u.get("input_tokens").and_then(Value::as_i64).unwrap_or(0);
-                    self.output_tokens = u.get("output_tokens").and_then(Value::as_i64).unwrap_or(0);
+                    self.output_tokens =
+                        u.get("output_tokens").and_then(Value::as_i64).unwrap_or(0);
                     self.has_usage = true;
                 }
-                let finish = if self.tool_index > 0 { "tool_calls" } else { "stop" };
+                let finish = if self.tool_index > 0 {
+                    "tool_calls"
+                } else {
+                    "stop"
+                };
                 self.finish_sent = true;
                 vec![self.chunk(json!({}), Some(finish))]
             }
@@ -220,7 +234,8 @@ impl ResponsesToOpenAI {
     }
 
     pub fn usage(&self) -> Option<(i64, i64)> {
-        self.has_usage.then_some((self.input_tokens, self.output_tokens))
+        self.has_usage
+            .then_some((self.input_tokens, self.output_tokens))
     }
 
     pub fn flush(&mut self) -> Vec<Value> {

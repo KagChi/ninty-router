@@ -47,7 +47,9 @@ pub async fn mint_access_token(client: &reqwest::Client, sa_json: &str) -> Resul
 
     let now = chrono::Utc::now().timestamp();
     {
-        let cache = cache().lock().map_err(|e| Error::Internal(format!("cache: {e}")))?;
+        let cache = cache()
+            .lock()
+            .map_err(|e| Error::Internal(format!("cache: {e}")))?;
         if let Some(t) = cache.get(client_email) {
             if t.expires_at - REFRESH_LEAD_SECS > now {
                 return Ok(t.access_token.clone());
@@ -75,10 +77,16 @@ pub async fn mint_access_token(client: &reqwest::Client, sa_json: &str) -> Resul
         ])
         .send()
         .await
-        .map_err(|e| Error::Upstream { status: 502, message: format!("google token: {e}") })?
+        .map_err(|e| Error::Upstream {
+            status: 502,
+            message: format!("google token: {e}"),
+        })?
         .json()
         .await
-        .map_err(|e| Error::Upstream { status: 502, message: format!("google token json: {e}") })?;
+        .map_err(|e| Error::Upstream {
+            status: 502,
+            message: format!("google token json: {e}"),
+        })?;
 
     let access_token = resp
         .get("access_token")
@@ -88,9 +96,14 @@ pub async fn mint_access_token(client: &reqwest::Client, sa_json: &str) -> Resul
             message: format!("no access_token in google response: {resp}"),
         })?
         .to_string();
-    let expires_in = resp.get("expires_in").and_then(|e| e.as_i64()).unwrap_or(3600);
+    let expires_in = resp
+        .get("expires_in")
+        .and_then(|e| e.as_i64())
+        .unwrap_or(3600);
 
-    let mut cache = cache().lock().map_err(|e| Error::Internal(format!("cache: {e}")))?;
+    let mut cache = cache()
+        .lock()
+        .map_err(|e| Error::Internal(format!("cache: {e}")))?;
     cache.insert(
         client_email.to_string(),
         CachedToken {

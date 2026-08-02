@@ -31,13 +31,23 @@ fn openai_to_gemini_request() {
     assert_eq!(fc["name"], "Bash_Tool");
     // functionResponse inlined as user turn after model turn
     assert_eq!(contents[2]["role"], "user");
-    assert_eq!(contents[2]["parts"][0]["functionResponse"]["name"], "Bash_Tool");
-    assert_eq!(contents[2]["parts"][0]["functionResponse"]["response"]["files"][0], "a");
+    assert_eq!(
+        contents[2]["parts"][0]["functionResponse"]["name"],
+        "Bash_Tool"
+    );
+    assert_eq!(
+        contents[2]["parts"][0]["functionResponse"]["response"]["files"][0],
+        "a"
+    );
     // tools → functionDeclarations, schema cleaned
     let decl = &out["tools"][0]["functionDeclarations"][0];
     assert_eq!(decl["name"], "Bash_Tool");
-    assert!(decl["parameters"]["properties"]["cmd"].get("minLength").is_none());
-    assert!(decl["parameters"]["properties"]["cmd"].get("format").is_none());
+    assert!(decl["parameters"]["properties"]["cmd"]
+        .get("minLength")
+        .is_none());
+    assert!(decl["parameters"]["properties"]["cmd"]
+        .get("format")
+        .is_none());
     // required filtered to existing properties
     assert_eq!(decl["parameters"]["required"], json!(["cmd"]));
 }
@@ -61,7 +71,10 @@ fn gemini_to_openai_request() {
     let out = gemini_to_openai(&body).unwrap();
     assert_eq!(out["messages"][0]["role"], "system");
     assert_eq!(out["messages"][2]["role"], "assistant");
-    assert_eq!(out["messages"][2]["tool_calls"][0]["function"]["name"], "Bash");
+    assert_eq!(
+        out["messages"][2]["tool_calls"][0]["function"]["name"],
+        "Bash"
+    );
     assert_eq!(out["messages"][3]["role"], "tool");
     assert_eq!(out["messages"][3]["tool_call_id"], "call_Bash");
     assert_eq!(out["temperature"], 0.2);
@@ -83,16 +96,31 @@ fn gemini_stream_to_openai() {
         out.extend(t.handle(c));
     }
     assert_eq!(out[0]["choices"][0]["delta"]["role"], "assistant");
-    assert!(out.iter().any(|c| c["choices"][0]["delta"]["content"] == "y"));
-    assert!(out.iter().any(|c| c["choices"][0]["delta"]["reasoning_content"] == "hmm"));
-    let tc = out.iter().find(|c| c["choices"][0]["delta"]["tool_calls"][0]["function"]["name"] == "Bash").unwrap();
-    assert!(tc["choices"][0]["delta"]["tool_calls"][0]["function"]["arguments"].as_str().unwrap().contains("\"a\":1"));
+    assert!(out
+        .iter()
+        .any(|c| c["choices"][0]["delta"]["content"] == "y"));
+    assert!(out
+        .iter()
+        .any(|c| c["choices"][0]["delta"]["reasoning_content"] == "hmm"));
+    let tc = out
+        .iter()
+        .find(|c| c["choices"][0]["delta"]["tool_calls"][0]["function"]["name"] == "Bash")
+        .unwrap();
+    assert!(
+        tc["choices"][0]["delta"]["tool_calls"][0]["function"]["arguments"]
+            .as_str()
+            .unwrap()
+            .contains("\"a\":1")
+    );
     let finish = out.last().unwrap();
     assert_eq!(finish["choices"][0]["finish_reason"], "tool_calls"); // stop + tool calls → tool_calls
     assert_eq!(finish["usage"]["prompt_tokens"], 10);
     assert_eq!(finish["usage"]["completion_tokens"], 6); // candidates + thoughts
     assert_eq!(finish["usage"]["prompt_tokens_details"]["cached_tokens"], 3);
-    assert_eq!(finish["usage"]["completion_tokens_details"]["reasoning_tokens"], 2);
+    assert_eq!(
+        finish["usage"]["completion_tokens_details"]["reasoning_tokens"],
+        2
+    );
 }
 
 #[test]
@@ -125,7 +153,10 @@ fn gemini_json_response() {
     assert_eq!(o["usage"]["completion_tokens"], 4);
 
     let back = engine::translator::response::openai_json_to_gemini(&o, "gemini-3").unwrap();
-    assert_eq!(back["candidates"][0]["content"]["parts"][0]["text"], "answer");
+    assert_eq!(
+        back["candidates"][0]["content"]["parts"][0]["text"],
+        "answer"
+    );
     assert_eq!(back["candidates"][0]["finishReason"], "STOP");
     assert_eq!(back["usageMetadata"]["promptTokenCount"], 12);
 }

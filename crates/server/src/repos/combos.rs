@@ -40,7 +40,9 @@ fn row_to_combo(row: &rusqlite::Row<'_>) -> rusqlite::Result<Combo> {
 pub async fn list(db: &Db) -> Result<Vec<Combo>> {
     db.call(|conn| {
         let mut stmt = conn
-            .prepare(&format!("SELECT {COLUMNS} FROM combos ORDER BY created_at ASC"))
+            .prepare(&format!(
+                "SELECT {COLUMNS} FROM combos ORDER BY created_at ASC"
+            ))
             .map_err(|e| Error::Db(e.to_string()))?;
         let rows = stmt
             .query_map([], row_to_combo)

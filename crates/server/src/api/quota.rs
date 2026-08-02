@@ -24,7 +24,9 @@ async fn cache_get(state: &Arc<AppState>, key: &str) -> Option<Value> {
         .db
         .call(move |conn| {
             Ok(conn
-                .query_row("SELECT value FROM kv WHERE key = ?1", [&key], |r| r.get::<_, String>(0))
+                .query_row("SELECT value FROM kv WHERE key = ?1", [&key], |r| {
+                    r.get::<_, String>(0)
+                })
                 .ok())
         })
         .await
@@ -58,7 +60,10 @@ async fn cache_set(state: &Arc<AppState>, key: &str, data: &Value) {
         .await;
 }
 
-async fn fetch_for(state: &Arc<AppState>, conn: &crate::repos::connections::Connection) -> QuotaReport {
+async fn fetch_for(
+    state: &Arc<AppState>,
+    conn: &crate::repos::connections::Connection,
+) -> QuotaReport {
     let key = format!("quota:{}", conn.id);
     if let Some(cached) = cache_get(state, &key).await {
         if let Ok(r) = serde_json::from_value::<QuotaReport>(cached) {
@@ -68,11 +73,23 @@ async fn fetch_for(state: &Arc<AppState>, conn: &crate::repos::connections::Conn
     let d = &conn.data;
     let token = d.get("accessToken").and_then(Value::as_str).unwrap_or("");
     let report = match conn.provider.as_str() {
-        "codex" => quota::codex(&state.http, &conn.id, token, d.get("chatgptAccountId").and_then(Value::as_str)).await,
+        "codex" => {
+            quota::codex(
+                &state.http,
+                &conn.id,
+                token,
+                d.get("chatgptAccountId").and_then(Value::as_str),
+            )
+            .await
+        }
         "github" => quota::github(&state.http, &conn.id, token).await,
         "claude" => quota::claude(&state.http, &conn.id, token).await,
         "codebuddy-cn" | "codebuddy-intl" => {
-            let t = if token.is_empty() { conn.api_key().unwrap_or("") } else { token };
+            let t = if token.is_empty() {
+                conn.api_key().unwrap_or("")
+            } else {
+                token
+            };
             quota::codebuddy(&state.http, &conn.id, &conn.provider, t).await
         }
         _ => QuotaReport::err(&conn.id, &conn.provider, "quota not supported"),
@@ -93,7 +110,13 @@ async fn all_quota(
     let conns = crate::repos::connections::list(&state.db, None).await?;
     let supported: Vec<_> = conns
         .into_iter()
-        .filter(|c| c.is_active && matches!(c.provider.as_str(), "codex" | "github" | "claude" | "codebuddy-cn" | "codebuddy-intl"))
+        .filter(|c| {
+            c.is_active
+                && matches!(
+                    c.provider.as_str(),
+                    "codex" | "github" | "claude" | "codebuddy-cn" | "codebuddy-intl"
+                )
+        })
         .collect();
     let mut reports = Vec::with_capacity(supported.len());
     for conn in supported {

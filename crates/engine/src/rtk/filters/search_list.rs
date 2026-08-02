@@ -34,14 +34,25 @@ pub fn search_list(input: &str) -> String {
             None => (".".to_string(), p.to_string()),
             Some(i) => {
                 let d = &p[..i];
-                (if d.is_empty() { "/".into() } else { d.to_string() }, p[i + 1..].to_string())
+                (
+                    if d.is_empty() {
+                        "/".into()
+                    } else {
+                        d.to_string()
+                    },
+                    p[i + 1..].to_string(),
+                )
             }
         };
         by_dir.entry(dir).or_default().push(name);
     }
 
     let dirs: Vec<&String> = by_dir.keys().collect();
-    let mut out = format!("{header}\n{} files in {} dirs:\n\n", paths.len(), dirs.len());
+    let mut out = format!(
+        "{header}\n{} files in {} dirs:\n\n",
+        paths.len(),
+        dirs.len()
+    );
     for dir in dirs.iter().take(TOTAL_DIR_MAX) {
         let names = &by_dir[*dir];
         out += &format!("{dir}/ ({}):\n", names.len());

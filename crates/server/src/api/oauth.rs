@@ -48,7 +48,17 @@ pub fn router() -> Router<Arc<AppState>> {
 }
 
 fn oauth_enabled(provider: &str) -> bool {
-    matches!(provider, "claude" | "codex" | "github" | "kiro" | "cline" | "codebuddy-cn" | "codebuddy-intl" | "qoder")
+    matches!(
+        provider,
+        "claude"
+            | "codex"
+            | "github"
+            | "kiro"
+            | "cline"
+            | "codebuddy-cn"
+            | "codebuddy-intl"
+            | "qoder"
+    )
 }
 
 struct CodebuddyOauth {
@@ -117,7 +127,14 @@ async fn authorize(Path(provider): Path<String>) -> Result<Json<Value>, ApiError
 
     pending().lock().await.insert(
         state.clone(),
-        Pending { provider, verifier, state: state.clone(), device_code: None, interval: 5, kiro_client: None },
+        Pending {
+            provider,
+            verifier,
+            state: state.clone(),
+            device_code: None,
+            interval: 5,
+            kiro_client: None,
+        },
     );
     Ok(Json(json!({"authorize_url": url, "state": state})))
 }
@@ -127,7 +144,11 @@ async fn exchange(
     Path(provider): Path<String>,
     Json(body): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
-    let code = body.get("code").and_then(Value::as_str).unwrap_or("").to_string();
+    let code = body
+        .get("code")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
     if code.is_empty() {
         return Err(Error::BadRequest("missing code".into()).into());
     }
@@ -142,7 +163,10 @@ async fn exchange(
             let state_key = if !code_state.is_empty() {
                 code_state.clone()
             } else {
-                body.get("state").and_then(Value::as_str).unwrap_or("").to_string()
+                body.get("state")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string()
             };
             let verifier = {
                 let mut map = pending().lock().await;
@@ -151,7 +175,9 @@ async fn exchange(
                     // fallback: single in-flight flow — take any pending claude flow
                     None => {
                         let key = map.keys().next().cloned();
-                        key.and_then(|k| map.remove(&k)).map(|p| p.verifier).unwrap_or_default()
+                        key.and_then(|k| map.remove(&k))
+                            .map(|p| p.verifier)
+                            .unwrap_or_default()
                     }
                 }
             };
@@ -278,7 +304,9 @@ async fn exchange(
                 }
             };
             if access.is_empty() {
-                return Err(Error::BadRequest("cline exchange returned no access token".into()).into());
+                return Err(
+                    Error::BadRequest("cline exchange returned no access token".into()).into(),
+                );
             }
             let expires_ms = chrono::DateTime::parse_from_rfc3339(&expires_at)
                 .map(|t| t.timestamp_millis())
@@ -292,7 +320,11 @@ async fn exchange(
                 &state.db,
                 NewConnection {
                     provider: "cline".into(),
-                    name: body.get("name").and_then(Value::as_str).map(String::from).or(if email.is_empty() { None } else { Some(email) }),
+                    name: body
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .map(String::from)
+                        .or(if email.is_empty() { None } else { Some(email) }),
                     priority: None,
                     api_key: None,
                     data: Some(data),
@@ -452,10 +484,24 @@ async fn device_code(
                 .map_err(upstream)?;
             let v: Value = resp.json().await.map_err(upstream)?;
             let data = v.get("data").cloned().unwrap_or(Value::Null);
-            let cb_state = data.get("state").and_then(Value::as_str).unwrap_or("").to_string();
-            let auth_url = data.get("authUrl").and_then(Value::as_str).unwrap_or("").to_string();
+            let cb_state = data
+                .get("state")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            let auth_url = data
+                .get("authUrl")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
             if v.get("code").and_then(Value::as_i64) != Some(0) || cb_state.is_empty() {
-                return Err(Error::BadRequest(format!("codebuddy state error: {}", v.get("msg").and_then(Value::as_str).unwrap_or("missing state"))).into());
+                return Err(Error::BadRequest(format!(
+                    "codebuddy state error: {}",
+                    v.get("msg")
+                        .and_then(Value::as_str)
+                        .unwrap_or("missing state")
+                ))
+                .into());
             }
             let st = pkce::generate_state();
             pending().lock().await.insert(
@@ -487,7 +533,11 @@ async fn poll(
     axum::extract::Query(q): axum::extract::Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, ApiError> {
     let st = q.get("state").cloned().unwrap_or_default();
-    let p = pending().lock().await.get(&st).cloned()
+    let p = pending()
+        .lock()
+        .await
+        .get(&st)
+        .cloned()
         .ok_or_else(|| Error::BadRequest("unknown or expired flow state".into()))?;
 
     let tokens: Value = match provider.as_str() {
@@ -543,10 +593,16 @@ async fn poll(
                 .await
                 .map_err(upstream)?;
             if resp.status().as_u16() == 202 || resp.status().as_u16() == 404 {
-                return Ok(Json(json!({"status": "authorization_pending", "interval": p.interval})));
+                return Ok(Json(
+                    json!({"status": "authorization_pending", "interval": p.interval}),
+                ));
             }
             let v: Value = resp.json().await.map_err(upstream)?;
-            let token = v.get("token").and_then(Value::as_str).unwrap_or("").to_string();
+            let token = v
+                .get("token")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
             if token.is_empty() {
                 return Ok(Json(json!({"status": "pending", "interval": p.interval})));
             }
@@ -580,17 +636,29 @@ async fn poll(
             });
             let conn = connections::create(
                 &state.db,
-                NewConnection { provider: "qoder".into(), name: None, priority: None, api_key: None, data: Some(data) },
+                NewConnection {
+                    provider: "qoder".into(),
+                    name: None,
+                    priority: None,
+                    api_key: None,
+                    data: Some(data),
+                },
             )
             .await?;
             pending().lock().await.remove(&st);
-            return Ok(Json(json!({"status": "connected", "connection": conn.sanitized()})));
+            return Ok(Json(
+                json!({"status": "connected", "connection": conn.sanitized()}),
+            ));
         }
         _ if codebuddy_oauth(&provider).is_some() => {
             let o = codebuddy_oauth(&provider).expect("checked");
             let resp = state
                 .http
-                .get(format!("{}?state={}", o.token_url, urlenc(p.device_code.as_deref().unwrap_or(""))))
+                .get(format!(
+                    "{}?state={}",
+                    o.token_url,
+                    urlenc(p.device_code.as_deref().unwrap_or(""))
+                ))
                 .header("accept", "application/json")
                 .header("user-agent", o.user_agent)
                 .header("x-requested-with", "XMLHttpRequest")
@@ -624,7 +692,9 @@ async fn poll(
     // device flow pending states
     if tokens.get("access_token").is_none() && tokens.get("accessToken").is_none() {
         let err = tokens["error"].as_str().unwrap_or("");
-        return Ok(Json(json!({"status": if err.is_empty() { "pending" } else { err }, "interval": p.interval})));
+        return Ok(Json(
+            json!({"status": if err.is_empty() { "pending" } else { err }, "interval": p.interval}),
+        ));
     }
 
     let gh_token = tokens["access_token"].as_str().unwrap_or("").to_string();
@@ -647,7 +717,10 @@ async fn poll(
             })
         }
         _ => {
-            let expires_in = tokens["expiresIn"].as_i64().or_else(|| tokens["expires_in"].as_i64()).unwrap_or(3600);
+            let expires_in = tokens["expiresIn"]
+                .as_i64()
+                .or_else(|| tokens["expires_in"].as_i64())
+                .unwrap_or(3600);
             let (cid, cs, endpoint) = p.kiro_client.clone().unwrap_or_default();
             json!({
                 "accessToken": tokens["accessToken"].as_str().or_else(|| tokens["access_token"].as_str()).unwrap_or(""),
@@ -663,15 +736,26 @@ async fn poll(
     };
     let conn = connections::create(
         &state.db,
-        NewConnection { provider, name: None, priority: None, api_key: None, data: Some(data) },
+        NewConnection {
+            provider,
+            name: None,
+            priority: None,
+            api_key: None,
+            data: Some(data),
+        },
     )
     .await?;
     pending().lock().await.remove(&st);
-    Ok(Json(json!({"status": "connected", "connection": conn.sanitized()})))
+    Ok(Json(
+        json!({"status": "connected", "connection": conn.sanitized()}),
+    ))
 }
 
 fn upstream(e: reqwest::Error) -> ApiError {
-    ApiError(Error::Upstream { status: 502, message: e.to_string() })
+    ApiError(Error::Upstream {
+        status: 502,
+        message: e.to_string(),
+    })
 }
 
 fn urlenc(s: &str) -> String {

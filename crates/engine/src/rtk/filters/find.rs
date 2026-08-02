@@ -19,7 +19,11 @@ pub fn find(input: &str) -> String {
             Some(i) => {
                 let d = &path[..i];
                 (
-                    if d.is_empty() { "/".to_string() } else { d.to_string() },
+                    if d.is_empty() {
+                        "/".to_string()
+                    } else {
+                        d.to_string()
+                    },
                     path[i + 1..].to_string(),
                 )
             }

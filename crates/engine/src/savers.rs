@@ -14,7 +14,8 @@ const SEP: &str = "\n\n";
 const CV_BOUNDARIES: &str = "Code blocks, file paths, commands, errors, URLs: keep exact. Security warnings, irreversible action confirmations, multi-step ordered sequences: write normal. Resume terse style after.";
 const CV_EXAMPLES: &str = "Not: \"Sure! I'd be happy to help you with that. The issue you're experiencing is likely caused by...\" Yes: \"Bug in auth middleware. Token expiry check use `<` not `<=`. Fix:\"";
 const CV_AUTO_CLARITY: &str = "Auto-Clarity: drop caveman for security warnings, irreversible actions, multi-step sequences where fragment ambiguity risks misread, or when user repeats a question. Resume after the clear part.";
-const CV_PERSISTENCE: &str = "ACTIVE EVERY RESPONSE. No revert after many turns. No filler drift. Still active if unsure.";
+const CV_PERSISTENCE: &str =
+    "ACTIVE EVERY RESPONSE. No revert after many turns. No filler drift. Still active if unsure.";
 const CV_NO_INVENTED: &str = "No invented abbreviations. Standard well-known tech acronyms (DB, API, HTTP, URL, JSON, ID, OS, CPU) OK. Names of code symbols, function names, API names, error strings: keep verbatim.";
 const CV_PRESERVE_LANG: &str = "Preserve the user's dominant language. User wrote Vietnamese, reply Vietnamese. User wrote English, reply English. Wenyan/classical-Chinese levels override this language-preservation rule. Code identifiers, error strings, file paths, commands: keep in their original form regardless of language.";
 const CV_NO_SELF_REF: &str = "No self-reference. Do not name or announce the style (no \"caveman mode\", no \"me caveman think\", no \"compressed mode active\"). Just respond.";
@@ -74,7 +75,8 @@ const PT_LADDER: &str = "Before writing code, stop at the first rung that holds:
 const PT_RULES: &str = "No unrequested abstractions (no interface with one implementation, no factory for one product, no config for a value that never changes). No boilerplate or scaffolding \"for later\". Deletion over addition. Boring over clever. Fewest files possible; shortest working diff wins. Two stdlib options the same size: take the edge-case-correct one. Mark deliberate simplifications with a `ponytail:` comment naming the ceiling and upgrade path.";
 const PT_OUTPUT: &str = "Code first. Then at most three short lines: what was skipped, when to add it. No essays or design notes. Pattern: `[code] → skipped: [X], add when [Y].`";
 const PT_NOT_LAZY: &str = "Never simplify away: input validation at trust boundaries, error handling that prevents data loss, security, accessibility, anything explicitly requested. Non-trivial logic leaves ONE runnable check behind (an assert-based self-check or one small test file; no frameworks). Trivial one-liners need no test.";
-const PT_PERSISTENCE: &str = "ACTIVE EVERY RESPONSE. No drift back to over-building. Still active if unsure.";
+const PT_PERSISTENCE: &str =
+    "ACTIVE EVERY RESPONSE. No drift back to over-building. Still active if unsure.";
 
 pub fn ponytail_prompt(level: &str) -> Option<String> {
     let intro = match level {
@@ -84,7 +86,16 @@ pub fn ponytail_prompt(level: &str) -> Option<String> {
         _ => return None,
     };
     Some(
-        [PT_PERSONA, intro, PT_LADDER, PT_RULES, PT_OUTPUT, PT_NOT_LAZY, PT_PERSISTENCE].join(" "),
+        [
+            PT_PERSONA,
+            intro,
+            PT_LADDER,
+            PT_RULES,
+            PT_OUTPUT,
+            PT_NOT_LAZY,
+            PT_PERSISTENCE,
+        ]
+        .join(" "),
     )
 }
 
@@ -155,7 +166,9 @@ fn inject_claude(body: &mut Value, prompt: &str) {
         }
         Some(Value::Array(blocks)) => {
             let block = json!({"type": "text", "text": prompt});
-            let last_cache = blocks.iter().rposition(|b| b.get("cache_control").is_some());
+            let last_cache = blocks
+                .iter()
+                .rposition(|b| b.get("cache_control").is_some());
             match last_cache {
                 Some(i) => blocks.insert(i, block),
                 None => blocks.push(block),
@@ -231,7 +244,14 @@ mod tests {
 
     #[test]
     fn prompts_exist() {
-        for l in ["lite", "full", "ultra", "wenyan-lite", "wenyan", "wenyan-ultra"] {
+        for l in [
+            "lite",
+            "full",
+            "ultra",
+            "wenyan-lite",
+            "wenyan",
+            "wenyan-ultra",
+        ] {
             assert!(caveman_prompt(l).is_some(), "{l}");
         }
         for l in ["lite", "full", "ultra"] {

@@ -30,7 +30,12 @@ pub fn sanitize_function_name(name: &str) -> String {
     if out.is_empty() {
         return "_unknown".into();
     }
-    if !out.chars().next().map(|c| c.is_ascii_alphabetic() || c == '_').unwrap_or(false) {
+    if !out
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_alphabetic() || c == '_')
+        .unwrap_or(false)
+    {
         out = format!("_{out}");
     }
     out.truncate(64);
@@ -57,7 +62,9 @@ pub fn openai_to_gemini(body: &Value) -> ninty_core::error::Result<Value> {
                     if tc.get("type").and_then(|t| t.as_str()) == Some("function") {
                         if let (Some(id), Some(name)) = (
                             tc.get("id").and_then(|i| i.as_str()),
-                            tc.get("function").and_then(|f| f.get("name")).and_then(|n| n.as_str()),
+                            tc.get("function")
+                                .and_then(|f| f.get("name"))
+                                .and_then(|n| n.as_str()),
                         ) {
                             id_to_name.insert(id.to_string(), name.to_string());
                         }
@@ -144,8 +151,12 @@ pub fn openai_to_gemini(body: &Value) -> ninty_core::error::Result<Value> {
                 if let Some(tcs) = msg.get("tool_calls").and_then(|t| t.as_array()) {
                     let mut fr_parts: Vec<Value> = Vec::new();
                     for tc in tcs {
-                        let Some(id) = tc.get("id").and_then(|i| i.as_str()) else { continue };
-                        let Some(raw) = tool_responses.get(id) else { continue };
+                        let Some(id) = tc.get("id").and_then(|i| i.as_str()) else {
+                            continue;
+                        };
+                        let Some(raw) = tool_responses.get(id) else {
+                            continue;
+                        };
                         let name = id_to_name
                             .get(id)
                             .cloned()
@@ -201,14 +212,18 @@ pub fn openai_to_gemini(body: &Value) -> ninty_core::error::Result<Value> {
                     (
                         t.get("name").and_then(|n| n.as_str()).unwrap_or(""),
                         t.get("description").and_then(|d| d.as_str()).unwrap_or(""),
-                        t.get("input_schema").cloned().unwrap_or(json!({"type":"object","properties":{}})),
+                        t.get("input_schema")
+                            .cloned()
+                            .unwrap_or(json!({"type":"object","properties":{}})),
                     )
                 } else {
                     let f = t.get("function").unwrap_or(t);
                     (
                         f.get("name").and_then(|n| n.as_str()).unwrap_or(""),
                         f.get("description").and_then(|d| d.as_str()).unwrap_or(""),
-                        f.get("parameters").cloned().unwrap_or(json!({"type":"object","properties":{}})),
+                        f.get("parameters")
+                            .cloned()
+                            .unwrap_or(json!({"type":"object","properties":{}})),
                     )
                 };
                 json!({
@@ -294,7 +309,12 @@ fn normalize_contents(contents: Vec<Value>) -> Vec<Value> {
                     .and_then(|p| p.as_array())
                     .cloned()
                     .unwrap_or_default();
-                last_parts.extend(c.get("parts").and_then(|p| p.as_array()).cloned().unwrap_or_default());
+                last_parts.extend(
+                    c.get("parts")
+                        .and_then(|p| p.as_array())
+                        .cloned()
+                        .unwrap_or_default(),
+                );
                 last["parts"] = Value::Array(last_parts);
                 continue;
             }
@@ -305,11 +325,40 @@ fn normalize_contents(contents: Vec<Value>) -> Vec<Value> {
 }
 
 const SCHEMA_BLOCKLIST: &[&str] = &[
-    "minLength", "maxLength", "exclusiveMinimum", "exclusiveMaximum", "minItems", "maxItems",
-    "format", "default", "examples", "$schema", "$defs", "definitions", "const", "$ref",
-    "$comment", "deprecated", "readOnly", "writeOnly", "additionalProperties", "propertyNames",
-    "patternProperties", "anyOf", "oneOf", "allOf", "not", "dependencies", "dependentSchemas",
-    "dependentRequired", "title", "if", "then", "else", "contentMediaType", "contentEncoding",
+    "minLength",
+    "maxLength",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "minItems",
+    "maxItems",
+    "format",
+    "default",
+    "examples",
+    "$schema",
+    "$defs",
+    "definitions",
+    "const",
+    "$ref",
+    "$comment",
+    "deprecated",
+    "readOnly",
+    "writeOnly",
+    "additionalProperties",
+    "propertyNames",
+    "patternProperties",
+    "anyOf",
+    "oneOf",
+    "allOf",
+    "not",
+    "dependencies",
+    "dependentSchemas",
+    "dependentRequired",
+    "title",
+    "if",
+    "then",
+    "else",
+    "contentMediaType",
+    "contentEncoding",
 ];
 
 pub fn clean_schema(v: &Value) -> Value {
@@ -385,7 +434,10 @@ pub fn gemini_to_openai(body: &Value) -> ninty_core::error::Result<Value> {
         .cloned()
         .unwrap_or_default()
     {
-        let role = content.get("role").and_then(|r| r.as_str()).unwrap_or("user");
+        let role = content
+            .get("role")
+            .and_then(|r| r.as_str())
+            .unwrap_or("user");
         let eff_role = if role == "user" { "user" } else { "assistant" };
         let mut parts: Vec<Value> = Vec::new();
         let mut tool_calls: Vec<Value> = Vec::new();
@@ -399,7 +451,8 @@ pub fn gemini_to_openai(body: &Value) -> ninty_core::error::Result<Value> {
         {
             if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
                 parts.push(json!({"type": "text", "text": text}));
-            } else if let Some(inline) = part.get("inlineData").or_else(|| part.get("inline_data")) {
+            } else if let Some(inline) = part.get("inlineData").or_else(|| part.get("inline_data"))
+            {
                 let mime = inline
                     .get("mimeType")
                     .or_else(|| inline.get("mime_type"))
@@ -538,7 +591,11 @@ pub fn gemini_json_to_openai(body: &Value, model: &str) -> ninty_core::error::Re
         .into_iter()
         .enumerate()
     {
-        if part.get("thought").and_then(|t| t.as_bool()).unwrap_or(false) {
+        if part
+            .get("thought")
+            .and_then(|t| t.as_bool())
+            .unwrap_or(false)
+        {
             if let Some(t) = part.get("text").and_then(|t| t.as_str()) {
                 reasoning.push_str(t);
             }
@@ -579,16 +636,30 @@ pub fn gemini_json_to_openai(body: &Value, model: &str) -> ninty_core::error::Re
     let finish = gemini_finish_to_openai(raw_finish, tool_calls.len() as i64);
 
     let um = resp.get("usageMetadata").cloned().unwrap_or(json!({}));
-    let prompt = um.get("promptTokenCount").and_then(|v| v.as_i64()).unwrap_or(0)
-        + um.get("thoughtsTokenCount").and_then(|v| v.as_i64()).unwrap_or(0);
-    let completion = um.get("candidatesTokenCount").and_then(|v| v.as_i64()).unwrap_or(0);
-    let total = um.get("totalTokenCount").and_then(|v| v.as_i64()).unwrap_or(0);
+    let prompt = um
+        .get("promptTokenCount")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0)
+        + um.get("thoughtsTokenCount")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+    let completion = um
+        .get("candidatesTokenCount")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let total = um
+        .get("totalTokenCount")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
     let mut usage = json!({
         "prompt_tokens": prompt,
         "completion_tokens": completion,
         "total_tokens": total,
     });
-    let thoughts = um.get("thoughtsTokenCount").and_then(|v| v.as_i64()).unwrap_or(0);
+    let thoughts = um
+        .get("thoughtsTokenCount")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
     if thoughts > 0 {
         usage["completion_tokens_details"] = json!({"reasoning_tokens": thoughts});
     }
@@ -642,7 +713,10 @@ impl GeminiToOpenAI {
     pub fn handle(&mut self, chunk: &Value) -> Vec<Value> {
         let resp = chunk.get("response").unwrap_or(chunk);
         // usage may arrive on usage-only events; read before the candidates guard
-        if let Some(um) = resp.get("usageMetadata").or_else(|| chunk.get("usageMetadata")) {
+        if let Some(um) = resp
+            .get("usageMetadata")
+            .or_else(|| chunk.get("usageMetadata"))
+        {
             self.usage = Some(map_usage(um));
         }
         let Some(candidate) = resp
@@ -676,7 +750,10 @@ impl GeminiToOpenAI {
             .cloned()
             .unwrap_or_default()
         {
-            let is_thought = part.get("thought").and_then(|t| t.as_bool()).unwrap_or(false);
+            let is_thought = part
+                .get("thought")
+                .and_then(|t| t.as_bool())
+                .unwrap_or(false);
             if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
                 if !text.is_empty() {
                     let delta = if is_thought {
@@ -731,20 +808,39 @@ impl GeminiToOpenAI {
             return vec![];
         }
         self.finish_sent = true;
-        let finish = if self.tool_call_count > 0 { "tool_calls" } else { "stop" };
+        let finish = if self.tool_call_count > 0 {
+            "tool_calls"
+        } else {
+            "stop"
+        };
         vec![self.chunk(json!({}), Some(finish), true)]
     }
 }
 
 fn map_usage(um: &Value) -> Value {
-    let prompt = um.get("promptTokenCount").and_then(|v| v.as_i64()).unwrap_or(0);
-    let mut candidates = um.get("candidatesTokenCount").and_then(|v| v.as_i64()).unwrap_or(0);
-    let thoughts = um.get("thoughtsTokenCount").and_then(|v| v.as_i64()).unwrap_or(0);
-    let total = um.get("totalTokenCount").and_then(|v| v.as_i64()).unwrap_or(0);
+    let prompt = um
+        .get("promptTokenCount")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let mut candidates = um
+        .get("candidatesTokenCount")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let thoughts = um
+        .get("thoughtsTokenCount")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let total = um
+        .get("totalTokenCount")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
     if candidates == 0 && total > 0 {
         candidates = (total - prompt - thoughts).max(0);
     }
-    let cached = um.get("cachedContentTokenCount").and_then(|v| v.as_i64()).unwrap_or(0);
+    let cached = um
+        .get("cachedContentTokenCount")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
     let mut usage = json!({
         "prompt_tokens": prompt,
         "completion_tokens": candidates + thoughts,
@@ -801,11 +897,19 @@ impl OpenAIToGemini {
     }
 
     pub fn handle(&mut self, chunk: &Value) -> Vec<Value> {
-        if chunk.get("choices").and_then(|c| c.as_array()).and_then(|c| c.first()).is_none() {
+        if chunk
+            .get("choices")
+            .and_then(|c| c.as_array())
+            .and_then(|c| c.first())
+            .is_none()
+        {
             // usage-only chunk
             if let Some(u) = chunk.get("usage") {
                 self.prompt_tokens = u.get("prompt_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
-                self.completion_tokens = u.get("completion_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+                self.completion_tokens = u
+                    .get("completion_tokens")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0);
                 self.has_usage = true;
             }
             return vec![];
@@ -824,7 +928,10 @@ impl OpenAIToGemini {
         }
         if let Some(u) = chunk.get("usage") {
             self.prompt_tokens = u.get("prompt_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
-            self.completion_tokens = u.get("completion_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+            self.completion_tokens = u
+                .get("completion_tokens")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
             self.has_usage = true;
         }
         self.sent_first = true;

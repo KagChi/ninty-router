@@ -16,7 +16,11 @@ pub async fn ensure_fresh(state: &Arc<AppState>, conn: &Connection) -> Result<Co
     let Some(lead) = lead_ms(&conn.provider) else {
         return Ok(conn.clone());
     };
-    let expires_at = conn.data.get("expiresAt").and_then(|v| v.as_i64()).unwrap_or(0);
+    let expires_at = conn
+        .data
+        .get("expiresAt")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
     if expires_at == 0 || !rf::should_refresh(expires_at, lead) {
         return Ok(conn.clone());
     }
@@ -35,17 +39,23 @@ pub async fn refresh_now(state: &Arc<AppState>, conn: &Connection) -> Result<Con
     let refreshed = match conn.provider.as_str() {
         "claude" => {
             if refresh_token.is_empty() {
-                return Err(Error::BadRequest("claude connection missing refreshToken".into()));
+                return Err(Error::BadRequest(
+                    "claude connection missing refreshToken".into(),
+                ));
             }
             rf::refresh_claude(&state.http, &refresh_token).await?
         }
         "codex" => {
             if refresh_token.is_empty() {
-                return Err(Error::BadRequest("codex connection missing refreshToken".into()));
+                return Err(Error::BadRequest(
+                    "codex connection missing refreshToken".into(),
+                ));
             }
             let refreshed_at = conn.data.get("refreshedAt").and_then(|v| v.as_i64());
             if rf::codex_must_reauth(refreshed_at) {
-                return Err(Error::BadRequest("codex refresh token stale (>8d) — re-auth required".into()));
+                return Err(Error::BadRequest(
+                    "codex refresh token stale (>8d) — re-auth required".into(),
+                ));
             }
             rf::refresh_codex(&state.http, &refresh_token).await?
         }
@@ -58,13 +68,19 @@ pub async fn refresh_now(state: &Arc<AppState>, conn: &Connection) -> Result<Con
                 .unwrap_or("")
                 .to_string();
             if gh.is_empty() {
-                return Err(Error::BadRequest("github connection missing accessToken".into()));
+                return Err(Error::BadRequest(
+                    "github connection missing accessToken".into(),
+                ));
             }
             let r = rf::mint_copilot_token(&state.http, &gh).await?;
             // copilot token stored separately, accessToken (github) untouched
             let mut data = conn.data.clone();
             data["copilotToken"] = json!(r.access_token);
-            if let Some(exp) = r.extra.get("copilotTokenExpiresAt").and_then(|v| v.as_str()) {
+            if let Some(exp) = r
+                .extra
+                .get("copilotTokenExpiresAt")
+                .and_then(|v| v.as_str())
+            {
                 data["copilotTokenExpiresAt"] = json!(exp);
             }
             return persist(state, conn, data).await;
@@ -74,23 +90,34 @@ pub async fn refresh_now(state: &Arc<AppState>, conn: &Connection) -> Result<Con
             let (cid, cs, endpoint) = (
                 d.get("clientId").and_then(|v| v.as_str()).unwrap_or(""),
                 d.get("clientSecret").and_then(|v| v.as_str()).unwrap_or(""),
-                d.get("ssoOidcEndpoint").and_then(|v| v.as_str()).unwrap_or(rf::KIRO_OIDC),
+                d.get("ssoOidcEndpoint")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(rf::KIRO_OIDC),
             );
             rf::refresh_kiro(&state.http, endpoint, cid, cs, &refresh_token).await?
         }
         "cline" => {
             if refresh_token.is_empty() {
-                return Err(Error::BadRequest("cline connection missing refreshToken".into()));
+                return Err(Error::BadRequest(
+                    "cline connection missing refreshToken".into(),
+                ));
             }
             rf::refresh_cline(&state.http, &refresh_token).await?
         }
-        "codebuddy-cn" => rf::refresh_codebuddy(&state.http, &rf::CODEBUDDY_CN, &refresh_token).await?,
-        "codebuddy-intl" => rf::refresh_codebuddy(&state.http, &rf::CODEBUDDY_INTL, &refresh_token).await?,
+        "codebuddy-cn" => {
+            rf::refresh_codebuddy(&state.http, &rf::CODEBUDDY_CN, &refresh_token).await?
+        }
+        "codebuddy-intl" => {
+            rf::refresh_codebuddy(&state.http, &rf::CODEBUDDY_INTL, &refresh_token).await?
+        }
         _ => return Ok(conn.clone()),
     };
 
     if refreshed.access_token.is_empty() {
-        return Err(Error::Upstream { status: 401, message: "refresh returned no access token".into() });
+        return Err(Error::Upstream {
+            status: 401,
+            message: "refresh returned no access token".into(),
+        });
     }
 
     let mut data = conn.data.clone();
@@ -118,11 +145,21 @@ pub async fn refresh_now(state: &Arc<AppState>, conn: &Connection) -> Result<Con
     persist(state, conn, data).await
 }
 
-async fn persist(state: &Arc<AppState>, conn: &Connection, data: serde_json::Value) -> Result<Connection> {
+async fn persist(
+    state: &Arc<AppState>,
+    conn: &Connection,
+    data: serde_json::Value,
+) -> Result<Connection> {
     connections::update(
         &state.db,
         &conn.id,
-        ConnectionPatch { name: None, priority: None, is_active: None, api_key: None, data: Some(data.clone()) },
+        ConnectionPatch {
+            name: None,
+            priority: None,
+            is_active: None,
+            api_key: None,
+            data: Some(data.clone()),
+        },
     )
     .await?;
     let mut out = conn.clone();

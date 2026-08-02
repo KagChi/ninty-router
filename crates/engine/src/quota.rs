@@ -55,7 +55,11 @@ fn reset_of(v: &Value, keys: &[&str]) -> Option<String> {
     None
 }
 
-async fn get(client: &reqwest::Client, url: &str, headers: &[(&str, String)]) -> Result<Value, String> {
+async fn get(
+    client: &reqwest::Client,
+    url: &str,
+    headers: &[(&str, String)],
+) -> Result<Value, String> {
     let mut req = client.get(url).header("accept", "application/json");
     for (k, v) in headers {
         req = req.header(*k, v);
@@ -69,8 +73,16 @@ async fn get(client: &reqwest::Client, url: &str, headers: &[(&str, String)]) ->
     serde_json::from_str(&text).map_err(|e| e.to_string())
 }
 
-async fn post(client: &reqwest::Client, url: &str, headers: &[(&str, String)]) -> Result<Value, String> {
-    let mut req = client.post(url).header("content-type", "application/json").header("accept", "application/json").body("{}");
+async fn post(
+    client: &reqwest::Client,
+    url: &str,
+    headers: &[(&str, String)],
+) -> Result<Value, String> {
+    let mut req = client
+        .post(url)
+        .header("content-type", "application/json")
+        .header("accept", "application/json")
+        .body("{}");
     for (k, v) in headers {
         req = req.header(*k, v);
     }
@@ -87,22 +99,39 @@ async fn post(client: &reqwest::Client, url: &str, headers: &[(&str, String)]) -
 // codex: wham/usage → primary/secondary windows
 // ---------------------------------------------------------------------------
 
-pub async fn codex(client: &reqwest::Client, conn_id: &str, access_token: &str, account_id: Option<&str>) -> QuotaReport {
+pub async fn codex(
+    client: &reqwest::Client,
+    conn_id: &str,
+    access_token: &str,
+    account_id: Option<&str>,
+) -> QuotaReport {
     let mut headers = vec![("authorization", format!("Bearer {access_token}"))];
     if let Some(acc) = account_id {
         headers.push(("chatgpt-account-id", acc.to_string()));
     }
-    match get(client, "https://chatgpt.com/backend-api/wham/usage", &headers).await {
+    match get(
+        client,
+        "https://chatgpt.com/backend-api/wham/usage",
+        &headers,
+    )
+    .await
+    {
         Err(e) => QuotaReport::err(conn_id, "codex", e),
         Ok(v) => {
             let rl = v.get("rate_limit").cloned().unwrap_or(v.clone());
             let mut windows = vec![];
-            for (key, label) in [("primary_window", "session"), ("secondary_window", "weekly")] {
+            for (key, label) in [
+                ("primary_window", "session"),
+                ("secondary_window", "weekly"),
+            ] {
                 let w = rl.get(key).or_else(|| v.get(key)).cloned();
                 if let Some(w) = w {
                     windows.push(QuotaWindow {
                         label: label.into(),
-                        used: pct(w.get("used_percent").or_else(|| w.get("percent_used")).unwrap_or(&Value::Null)),
+                        used: pct(w
+                            .get("used_percent")
+                            .or_else(|| w.get("percent_used"))
+                            .unwrap_or(&Value::Null)),
                         reset_at: reset_of(&w, &["reset_at", "resets_at", "resetAt"]),
                     });
                 }
@@ -134,10 +163,19 @@ pub async fn github(client: &reqwest::Client, conn_id: &str, github_token: &str)
         ("editor-version", "vscode/1.100.0".into()),
         ("editor-plugin-version", "copilot-chat/0.26.7".into()),
     ];
-    match get(client, "https://api.github.com/copilot_internal/user", &headers).await {
+    match get(
+        client,
+        "https://api.github.com/copilot_internal/user",
+        &headers,
+    )
+    .await
+    {
         Err(e) => QuotaReport::err(conn_id, "github", e),
         Ok(v) => {
-            let plan = v.get("copilot_plan").and_then(Value::as_str).map(String::from);
+            let plan = v
+                .get("copilot_plan")
+                .and_then(Value::as_str)
+                .map(String::from);
             let mut windows = vec![];
             if let Some(snaps) = v.get("quota_snapshots") {
                 for (key, label) in [
@@ -146,7 +184,10 @@ pub async fn github(client: &reqwest::Client, conn_id: &str, github_token: &str)
                     ("completions", "completions"),
                 ] {
                     if let Some(w) = snaps.get(key) {
-                        let used = pct(w.get("percent_used").or_else(|| w.get("used_percent")).unwrap_or(&Value::Null));
+                        let used = pct(w
+                            .get("percent_used")
+                            .or_else(|| w.get("used_percent"))
+                            .unwrap_or(&Value::Null));
                         windows.push(QuotaWindow {
                             label: label.into(),
                             used,
@@ -165,7 +206,10 @@ pub async fn github(client: &reqwest::Client, conn_id: &str, github_token: &str)
                             windows.push(QuotaWindow {
                                 label: label.into(),
                                 used: (u / t * 100.0).clamp(0.0, 100.0),
-                                reset_at: reset_of(&v, &["quota_reset_date", "monthly_quota_reset_date"]),
+                                reset_at: reset_of(
+                                    &v,
+                                    &["quota_reset_date", "monthly_quota_reset_date"],
+                                ),
                             });
                         }
                     }
@@ -196,7 +240,13 @@ pub async fn claude(client: &reqwest::Client, conn_id: &str, access_token: &str)
         ("anthropic-beta", "oauth-2025-04-20".into()),
         ("anthropic-version", "2023-06-01".into()),
     ];
-    match get(client, "https://api.anthropic.com/api/oauth/usage", &headers).await {
+    match get(
+        client,
+        "https://api.anthropic.com/api/oauth/usage",
+        &headers,
+    )
+    .await
+    {
         Err(e) => QuotaReport::err(conn_id, "claude", e),
         Ok(v) => {
             let mut windows = vec![];
@@ -257,7 +307,13 @@ pub async fn codebuddy(
         ("user-agent", ua.to_string()),
         ("x-product", "SaaS".into()),
     ];
-    match post(client, &format!("{base}/v2/billing/meter/get-user-resource"), &headers).await {
+    match post(
+        client,
+        &format!("{base}/v2/billing/meter/get-user-resource"),
+        &headers,
+    )
+    .await
+    {
         Err(e) => QuotaReport::err(conn_id, provider, e),
         Ok(v) => {
             let accounts = v
@@ -286,10 +342,20 @@ pub async fn codebuddy(
                     let end = reset_of(acc, &["CycleEndTime"]);
                     match (start, end) {
                         (Some(s), Some(e)) => {
-                            let days = (chrono::DateTime::parse_from_rfc3339(&e).ok()
-                                .and_then(|e| chrono::DateTime::parse_from_rfc3339(&s).ok().map(|s| (e - s).num_days())))
+                            let days =
+                                (chrono::DateTime::parse_from_rfc3339(&e).ok().and_then(|e| {
+                                    chrono::DateTime::parse_from_rfc3339(&s)
+                                        .ok()
+                                        .map(|s| (e - s).num_days())
+                                }))
                                 .unwrap_or(30);
-                            if days <= 1 { "Daily".to_string() } else if days <= 10 { "Weekly".to_string() } else { "Monthly".to_string() }
+                            if days <= 1 {
+                                "Daily".to_string()
+                            } else if days <= 10 {
+                                "Weekly".to_string()
+                            } else {
+                                "Monthly".to_string()
+                            }
                         }
                         _ => format!("Pack {}", i + 1),
                     }
@@ -352,7 +418,9 @@ mod tests {
         });
         let q = v.get("limited_user_quota").unwrap();
         let u = v.get("limited_user_quotas").unwrap();
-        let used_pct = u.get("chat").and_then(Value::as_f64).unwrap() / q.get("chat").and_then(Value::as_f64).unwrap() * 100.0;
+        let used_pct = u.get("chat").and_then(Value::as_f64).unwrap()
+            / q.get("chat").and_then(Value::as_f64).unwrap()
+            * 100.0;
         assert_eq!(used_pct, 20.0);
     }
 }

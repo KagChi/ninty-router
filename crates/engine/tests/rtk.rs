@@ -18,8 +18,12 @@ fn git_diff_fixture() -> String {
     for f in 0..8 {
         s.push_str(&format!("diff --git a/src/f{f}.rs b/src/f{f}.rs\nindex 111..222 100644\n--- a/src/f{f}.rs\n+++ b/src/f{f}.rs\n@@ -1,250 +1,250 @@ fn f{f}\n"));
         for i in 0..240 {
-            s.push_str(&format!("-old line {i} with some content to make it long enough\n"));
-            s.push_str(&format!("+new line {i} with some content to make it long enough\n"));
+            s.push_str(&format!(
+                "-old line {i} with some content to make it long enough\n"
+            ));
+            s.push_str(&format!(
+                "+new line {i} with some content to make it long enough\n"
+            ));
             s.push_str(" context line\n");
         }
     }
@@ -85,8 +89,12 @@ fn find_fixture() -> String {
 fn ls_fixture() -> String {
     let mut s = String::from("total 9999\n");
     for i in 0..60 {
-        s.push_str(&format!("-rw-r--r--  1 user  staff  4096 Aug  1 10:00 some_source_file_{i}.rs\n"));
-        s.push_str(&format!("drwxr-xr-x  2 user  staff    64 Aug  1 10:00 dir{i}\n"));
+        s.push_str(&format!(
+            "-rw-r--r--  1 user  staff  4096 Aug  1 10:00 some_source_file_{i}.rs\n"
+        ));
+        s.push_str(&format!(
+            "drwxr-xr-x  2 user  staff    64 Aug  1 10:00 dir{i}\n"
+        ));
     }
     s.push_str("-rw-r--r--  1 user  staff  1024 Aug  1 10:00 node_modules\n");
     s
@@ -113,7 +121,9 @@ fn dedup_fixture() -> String {
 fn numbered_fixture() -> String {
     let mut s = String::new();
     for i in 1..=400 {
-        s.push_str(&format!("  {i}|fn some_function_{i}() {{ do_something_with_a_long_name({i}); }}\n"));
+        s.push_str(&format!(
+            "  {i}|fn some_function_{i}() {{ do_something_with_a_long_name({i}); }}\n"
+        ));
     }
     s
 }
@@ -131,7 +141,9 @@ fn search_list_fixture() -> String {
 fn plain_blob_fixture() -> String {
     let mut s = String::new();
     for i in 0..400 {
-        s.push_str(&format!("This is plain prose line {i} with no structure whatsoever, just words.\n"));
+        s.push_str(&format!(
+            "This is plain prose line {i} with no structure whatsoever, just words.\n"
+        ));
     }
     s
 }
@@ -254,7 +266,8 @@ fn read_numbered() {
     // autodetect: fires only when ≥250 lines fit in the 1024-char window
     // (reference behaviour — same gate in autodetect.js)
     let dense = "1|x
-".repeat(300);
+"
+    .repeat(300);
     let (name, _) = autodetect::auto_detect(&dense).unwrap();
     assert_eq!(name, "read-numbered");
 }

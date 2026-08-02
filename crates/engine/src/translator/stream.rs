@@ -116,7 +116,11 @@ impl ClaudeToOpenAI {
                     Some("tool_use") => {
                         let tc_index = self.tool_call_index;
                         self.tool_call_index += 1;
-                        let id = block.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
+                        let id = block
+                            .get("id")
+                            .and_then(|i| i.as_str())
+                            .unwrap_or("")
+                            .to_string();
                         let name = block
                             .get("name")
                             .and_then(|n| n.as_str())
@@ -160,7 +164,10 @@ impl ClaudeToOpenAI {
                         }
                     }
                     Some("input_json_delta") => {
-                        let partial = delta.get("partial_json").and_then(|p| p.as_str()).unwrap_or("");
+                        let partial = delta
+                            .get("partial_json")
+                            .and_then(|p| p.as_str())
+                            .unwrap_or("");
                         if partial.is_empty() {
                             return vec![];
                         }
@@ -195,7 +202,8 @@ impl ClaudeToOpenAI {
                 if let Some(u) = event.get("usage") {
                     self.input_tokens = opt_num(u.get("input_tokens")).unwrap_or(self.input_tokens);
                     self.output_tokens = opt_num(u.get("output_tokens")).unwrap_or(0);
-                    self.cache_read = opt_num(u.get("cache_read_input_tokens")).unwrap_or(self.cache_read);
+                    self.cache_read =
+                        opt_num(u.get("cache_read_input_tokens")).unwrap_or(self.cache_read);
                     self.cache_create =
                         opt_num(u.get("cache_creation_input_tokens")).unwrap_or(self.cache_create);
                     self.has_usage = true;
@@ -218,11 +226,13 @@ impl ClaudeToOpenAI {
                     return vec![];
                 }
                 self.finish_sent = true;
-                let finish = self.finish_reason.unwrap_or(if !self.tool_calls.is_empty() {
-                    "tool_calls"
-                } else {
-                    "stop"
-                });
+                let finish = self
+                    .finish_reason
+                    .unwrap_or(if !self.tool_calls.is_empty() {
+                        "tool_calls"
+                    } else {
+                        "stop"
+                    });
                 vec![self.chunk(json!({}), Some(finish))]
             }
             _ => vec![],
@@ -247,11 +257,13 @@ impl ClaudeToOpenAI {
             return vec![];
         }
         self.finish_sent = true;
-        let finish = self.finish_reason.unwrap_or(if !self.tool_calls.is_empty() {
-            "tool_calls"
-        } else {
-            "stop"
-        });
+        let finish = self
+            .finish_reason
+            .unwrap_or(if !self.tool_calls.is_empty() {
+                "tool_calls"
+            } else {
+                "stop"
+            });
         vec![self.chunk(json!({}), Some(finish))]
     }
 }
@@ -336,7 +348,12 @@ impl OpenAIToClaude {
     }
 
     pub fn handle(&mut self, chunk: &Value) -> Vec<Value> {
-        if chunk.get("choices").and_then(|c| c.as_array()).and_then(|c| c.first()).is_none() {
+        if chunk
+            .get("choices")
+            .and_then(|c| c.as_array())
+            .and_then(|c| c.first())
+            .is_none()
+        {
             return vec![];
         }
 
@@ -421,8 +438,12 @@ impl OpenAIToClaude {
                             .and_then(|f| f.get("name"))
                             .and_then(|n| n.as_str())
                             .unwrap_or("");
-                        let name = raw_name.strip_prefix("proxy_").unwrap_or(raw_name).to_string();
-                        self.tool_calls.insert(idx, (id.to_string(), name.clone(), block_index));
+                        let name = raw_name
+                            .strip_prefix("proxy_")
+                            .unwrap_or(raw_name)
+                            .to_string();
+                        self.tool_calls
+                            .insert(idx, (id.to_string(), name.clone(), block_index));
                         out.push(json!({
                             "type": "content_block_start",
                             "index": block_index,
@@ -507,7 +528,11 @@ impl OpenAIToClaude {
         } else {
             json!({"input_tokens": 0, "output_tokens": 0})
         };
-        let stop_reason = if tool_calls.is_empty() { "end_turn" } else { "tool_use" };
+        let stop_reason = if tool_calls.is_empty() {
+            "end_turn"
+        } else {
+            "tool_use"
+        };
         out.push(json!({
             "type": "message_delta",
             "delta": {"stop_reason": stop_reason},
@@ -583,7 +608,8 @@ fn sanitize_tool_args(name: &str, args_json: &str) -> String {
                     .map(|p| {
                         let mut parts = p.split('-');
                         let ok_len = matches!(p.matches('-').count(), 0 | 1);
-                        ok_len && parts.all(|x| !x.is_empty() && x.chars().all(|c| c.is_ascii_digit()))
+                        ok_len
+                            && parts.all(|x| !x.is_empty() && x.chars().all(|c| c.is_ascii_digit()))
                     })
                     .unwrap_or(false);
             if obj.contains_key("pages") && !pages_valid {

@@ -10,7 +10,9 @@ pub fn grep(input: &str) -> String {
     let mut total = 0usize;
 
     for line in input.lines() {
-        let Some(first) = line.find(':') else { continue };
+        let Some(first) = line.find(':') else {
+            continue;
+        };
         let Some(second_rel) = line[first + 1..].find(':') else {
             continue;
         };

@@ -107,7 +107,10 @@ pub fn build_output(input: &str) -> String {
         out += &format!("{d}\n");
     }
     if deprecations.len() > DEPRECATION_KEEP {
-        out += &format!("... +{} more deprecated packages\n", deprecations.len() - DEPRECATION_KEEP);
+        out += &format!(
+            "... +{} more deprecated packages\n",
+            deprecations.len() - DEPRECATION_KEEP
+        );
     }
     if compiling > 0 {
         out += &format!("Compiled {compiling} packages\n");

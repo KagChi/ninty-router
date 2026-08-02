@@ -1,10 +1,10 @@
 //! Qoder (COSY) provider support: header signing, request body, SSE envelope.
 //! Port of shared/qoder/{cosy,constants}.js + executors/qoder.js essentials.
 
+use aes::cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit};
 use aes::Aes128;
-use aes::cipher::{BlockEncryptMut, KeyIvInit, block_padding::Pkcs7};
 use base64::Engine;
-use rsa::{Pkcs1v15Encrypt, RsaPublicKey, pkcs8::DecodePublicKey};
+use rsa::{pkcs8::DecodePublicKey, Pkcs1v15Encrypt, RsaPublicKey};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -85,7 +85,11 @@ mod url {
 }
 
 /// Build the 19-header COSY set for one request. Body = exact bytes sent.
-pub fn build_cosy_headers(body: &[u8], request_url: &str, creds: &CosyCreds) -> Result<Vec<(String, String)>> {
+pub fn build_cosy_headers(
+    body: &[u8],
+    request_url: &str,
+    creds: &CosyCreds,
+) -> Result<Vec<(String, String)>> {
     if creds.user_id.is_empty() || creds.auth_token.is_empty() {
         return Err(Error::BadRequest("qoder cosy creds empty".into()));
     }
@@ -119,7 +123,10 @@ pub fn build_cosy_headers(body: &[u8], request_url: &str, creds: &CosyCreds) -> 
     let body_hash = md5_hex(body);
 
     Ok(vec![
-        ("Authorization".into(), format!("Bearer COSY.{payload_b64}.{sig}")),
+        (
+            "Authorization".into(),
+            format!("Bearer COSY.{payload_b64}.{sig}"),
+        ),
         ("Cosy-Key".into(), cosy_key),
         ("Cosy-User".into(), creds.user_id.clone()),
         ("Cosy-Date".into(), timestamp),
@@ -151,7 +158,12 @@ pub fn stable_hash(prefix: &str, parts: &[&str]) -> String {
     hex::encode(h.finalize())[..16].to_string()
 }
 
-fn stable_chat_record_id(model: &str, messages: &[Value], tools: Option<&Value>, max_tokens: i64) -> String {
+fn stable_chat_record_id(
+    model: &str,
+    messages: &[Value],
+    tools: Option<&Value>,
+    max_tokens: i64,
+) -> String {
     let mut h = Sha256::new();
     h.update(b"qoder-record\0");
     h.update(model.as_bytes());
@@ -189,10 +201,20 @@ fn extract_text(content: &Value) -> String {
 }
 
 /// Map an openai chat body → the exact Qoder shape. model_config from live catalog.
-pub fn build_chat_body(model_key: &str, body: &Value, model_config: &Value, user_id: &str) -> Value {
+pub fn build_chat_body(
+    model_key: &str,
+    body: &Value,
+    model_config: &Value,
+    user_id: &str,
+) -> Value {
     let mut messages: Vec<Value> = vec![];
     let mut system_parts: Vec<String> = vec![];
-    for m in body.get("messages").and_then(Value::as_array).cloned().unwrap_or_default() {
+    for m in body
+        .get("messages")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+    {
         let role = m.get("role").and_then(Value::as_str).unwrap_or("user");
         let text = extract_text(m.get("content").unwrap_or(&Value::Null));
         if role == "system" {
@@ -208,7 +230,10 @@ pub fn build_chat_body(model_key: &str, body: &Value, model_config: &Value, user
     let system_text = system_parts.join("\n\n");
     let tools = body.get("tools").cloned().unwrap_or(Value::Null);
 
-    let max_output = model_config.get("max_output_tokens").and_then(Value::as_i64).unwrap_or(0);
+    let max_output = model_config
+        .get("max_output_tokens")
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
     let mut max_tokens = if max_output > 0 { max_output } else { 32_768 };
     for k in ["max_tokens", "max_completion_tokens"] {
         if let Some(v) = body.get(k).and_then(Value::as_i64) {
@@ -295,23 +320,33 @@ pub async fn fetch_model_config(
     for (k, v) in headers {
         req = req.header(k, v);
     }
-    let resp = req
-        .send()
-        .await
-        .map_err(|e| Error::Upstream { status: 502, message: e.to_string() })?;
+    let resp = req.send().await.map_err(|e| Error::Upstream {
+        status: 502,
+        message: e.to_string(),
+    })?;
     if !resp.status().is_success() {
         return Err(Error::Upstream {
             status: resp.status().as_u16(),
             message: "qoder model list failed".into(),
         });
     }
-    let v: Value = resp.json().await.map_err(|e| Error::Internal(e.to_string()))?;
+    let v: Value = resp
+        .json()
+        .await
+        .map_err(|e| Error::Internal(e.to_string()))?;
     let key = model_key.to_string();
     v.get("chat")
         .and_then(Value::as_array)
-        .and_then(|arr| arr.iter().find(|e| e.get("key").and_then(Value::as_str) == Some(&key)))
+        .and_then(|arr| {
+            arr.iter()
+                .find(|e| e.get("key").and_then(Value::as_str) == Some(&key))
+        })
         .cloned()
-        .ok_or_else(|| Error::BadRequest(format!("qoder: model_config for '{model_key}' not in catalog")))
+        .ok_or_else(|| {
+            Error::BadRequest(format!(
+                "qoder: model_config for '{model_key}' not in catalog"
+            ))
+        })
 }
 
 /// Unwrap one upstream SSE `data:` payload → inner openai chunk JSON string,
@@ -321,7 +356,10 @@ pub fn unwrap_envelope(data: &str, model: &str) -> Option<String> {
         return Some("[DONE]".into());
     }
     let env: Value = serde_json::from_str(data).ok()?;
-    let status = env.get("statusCodeValue").and_then(Value::as_i64).unwrap_or(200);
+    let status = env
+        .get("statusCodeValue")
+        .and_then(Value::as_i64)
+        .unwrap_or(200);
     let inner = env.get("body").and_then(Value::as_str).unwrap_or("");
     if status != 200 {
         let msg: String = inner.chars().take(200).collect();
@@ -365,7 +403,9 @@ mod tests {
         assert!(out.contains("hi"));
         assert_eq!(unwrap_envelope("[DONE]", "m").unwrap(), "[DONE]");
         let err = json!({"statusCodeValue":429,"body":"slow down"}).to_string();
-        assert!(unwrap_envelope(&err, "m").unwrap().contains("qoder error 429"));
+        assert!(unwrap_envelope(&err, "m")
+            .unwrap()
+            .contains("qoder error 429"));
     }
 
     #[test]
@@ -380,7 +420,10 @@ mod tests {
         assert_eq!(out["parameters"]["max_tokens"], 4096);
         assert_eq!(out["messages"].as_array().unwrap().len(), 1);
         assert_eq!(out["chat_context"]["text"], "hello");
-        assert_eq!(out["session_id"], stable_hash("qoder-session", &["user-1", "qmodel"]));
+        assert_eq!(
+            out["session_id"],
+            stable_hash("qoder-session", &["user-1", "qmodel"])
+        );
     }
 
     #[test]
@@ -393,11 +436,20 @@ mod tests {
             machine_id: "machine-1".into(),
         };
         let headers = build_cosy_headers(b"{}", CHAT_URL, &creds).unwrap();
-        let get = |k: &str| headers.iter().find(|(h, _)| h == k).map(|(_, v)| v.clone()).unwrap();
+        let get = |k: &str| {
+            headers
+                .iter()
+                .find(|(h, _)| h == k)
+                .map(|(_, v)| v.clone())
+                .unwrap()
+        };
         assert!(get("Authorization").starts_with("Bearer COSY."));
         assert_eq!(get("Cosy-User"), "u");
         assert_eq!(get("Cosy-Machineid"), "machine-1");
-        assert_eq!(get("Cosy-Sigpath"), "/api/v2/service/pro/sse/agent_chat_generation");
+        assert_eq!(
+            get("Cosy-Sigpath"),
+            "/api/v2/service/pro/sse/agent_chat_generation"
+        );
         assert_eq!(get("Cosy-Bodylength"), "2");
         assert_eq!(headers.len(), 19);
     }

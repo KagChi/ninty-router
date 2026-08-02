@@ -103,7 +103,10 @@ fn claude_to_openai_basic() {
     let asst = &out["messages"][2];
     assert_eq!(asst["role"], "assistant");
     assert_eq!(asst["tool_calls"][0]["function"]["name"], "Bash");
-    assert!(asst["tool_calls"][0]["function"]["arguments"].as_str().unwrap().contains("ls"));
+    assert!(asst["tool_calls"][0]["function"]["arguments"]
+        .as_str()
+        .unwrap()
+        .contains("ls"));
     // tools → function shape; any → required
     assert_eq!(out["tools"][0]["function"]["name"], "Bash");
     assert_eq!(out["tool_choice"], "required");
@@ -148,15 +151,31 @@ fn claude_stream_to_openai() {
     // role chunk
     assert_eq!(out[0]["choices"][0]["delta"]["role"], "assistant");
     // text delta
-    assert!(out.iter().any(|c| c["choices"][0]["delta"]["content"] == "hi"));
+    assert!(out
+        .iter()
+        .any(|c| c["choices"][0]["delta"]["content"] == "hi"));
     // tool call open
-    let open = out.iter().find(|c| c["choices"][0]["delta"]["tool_calls"][0]["function"]["name"] == "Bash").unwrap();
+    let open = out
+        .iter()
+        .find(|c| c["choices"][0]["delta"]["tool_calls"][0]["function"]["name"] == "Bash")
+        .unwrap();
     assert_eq!(open["choices"][0]["delta"]["tool_calls"][0]["id"], "tu_1");
     // arg deltas stream with repeated id
-    let arg_chunks: Vec<_> = out.iter().filter(|c| c["choices"][0]["delta"]["tool_calls"][0]["function"]["arguments"].as_str().map(|s| !s.is_empty()).unwrap_or(false)).collect();
+    let arg_chunks: Vec<_> = out
+        .iter()
+        .filter(|c| {
+            c["choices"][0]["delta"]["tool_calls"][0]["function"]["arguments"]
+                .as_str()
+                .map(|s| !s.is_empty())
+                .unwrap_or(false)
+        })
+        .collect();
     assert_eq!(arg_chunks.len(), 2);
     // finish chunk: tool_use → tool_calls, usage folded cache into prompt
-    let finish = out.iter().find(|c| c["choices"][0]["finish_reason"].is_string()).unwrap();
+    let finish = out
+        .iter()
+        .find(|c| c["choices"][0]["finish_reason"].is_string())
+        .unwrap();
     assert_eq!(finish["choices"][0]["finish_reason"], "tool_calls");
     assert_eq!(finish["usage"]["prompt_tokens"], 15);
     assert_eq!(finish["usage"]["completion_tokens"], 7);
@@ -180,14 +199,21 @@ fn openai_stream_to_claude() {
     assert_eq!(out[0]["type"], "message_start");
     assert_eq!(out[0]["message"]["id"], "abc12345");
     // text block start + deltas
-    assert!(out.iter().any(|e| e["type"] == "content_block_start" && e["content_block"]["type"] == "text"));
+    assert!(out
+        .iter()
+        .any(|e| e["type"] == "content_block_start" && e["content_block"]["type"] == "text"));
     assert!(out.iter().any(|e| e["delta"]["text"] == "llo"));
     // thinking block
     assert!(out.iter().any(|e| e["delta"]["thinking"] == "thinking"));
     // tool_use block opened with id
-    assert!(out.iter().any(|e| e["content_block"]["type"] == "tool_use" && e["content_block"]["id"] == "call_1"));
+    assert!(out
+        .iter()
+        .any(|e| e["content_block"]["type"] == "tool_use" && e["content_block"]["id"] == "call_1"));
     // args emitted as ONE input_json_delta at finish, sanitized (limit string→number)
-    let arg_delta = out.iter().find(|e| e["delta"]["type"] == "input_json_delta").unwrap();
+    let arg_delta = out
+        .iter()
+        .find(|e| e["delta"]["type"] == "input_json_delta")
+        .unwrap();
     assert_eq!(arg_delta["delta"]["partial_json"], "{\"limit\":50}");
     // message_delta stop_reason tool_use + usage
     let md = out.iter().find(|e| e["type"] == "message_delta").unwrap();

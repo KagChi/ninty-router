@@ -37,7 +37,10 @@ async fn update(
     Ok(())
 }
 
-async fn remove(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> Result<(), ApiError> {
+async fn remove(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<(), ApiError> {
     combos::delete(&state.db, &id).await?;
     Ok(())
 }

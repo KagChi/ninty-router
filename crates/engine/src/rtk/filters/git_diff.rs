@@ -24,11 +24,7 @@ pub fn git_diff(diff: &str) -> String {
             if !current_file.is_empty() && (added > 0 || removed > 0) {
                 result.push(format!("  +{added} -{removed}"));
             }
-            current_file = line
-                .split(" b/")
-                .skip(1)
-                .collect::<Vec<_>>()
-                .join(" b/");
+            current_file = line.split(" b/").skip(1).collect::<Vec<_>>().join(" b/");
             if current_file.is_empty() {
                 current_file = "unknown".into();
             }
@@ -63,7 +59,10 @@ pub fn git_diff(diff: &str) -> String {
                 } else {
                     hunk_skipped += 1;
                 }
-            } else if hunk_shown < GIT_DIFF_HUNK_MAX_LINES && !line.starts_with('\\') && hunk_shown > 0 {
+            } else if hunk_shown < GIT_DIFF_HUNK_MAX_LINES
+                && !line.starts_with('\\')
+                && hunk_shown > 0
+            {
                 result.push(format!("  {line}"));
                 hunk_shown += 1;
             }

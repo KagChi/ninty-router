@@ -134,7 +134,10 @@ pub fn openai_json_to_gemini(body: &Value, model: &str) -> ninty_core::error::Re
 
     let u = body.get("usage").cloned().unwrap_or(json!({}));
     let prompt = u.get("prompt_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
-    let completion = u.get("completion_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+    let completion = u
+        .get("completion_tokens")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
 
     Ok(json!({
         "candidates": [{

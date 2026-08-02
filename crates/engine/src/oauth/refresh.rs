@@ -56,7 +56,8 @@ pub fn copilot_needs_remint(expires_at_rfc3339: Option<&str>) -> bool {
     match expires_at_rfc3339 {
         Some(s) => chrono::DateTime::parse_from_rfc3339(s)
             .map(|t| {
-                t.timestamp_millis() - chrono::Utc::now().timestamp_millis() < COPILOT_REMINT_LEAD_MS
+                t.timestamp_millis() - chrono::Utc::now().timestamp_millis()
+                    < COPILOT_REMINT_LEAD_MS
             })
             .unwrap_or(true),
         None => true,
@@ -71,11 +72,17 @@ async fn post_json(client: &reqwest::Client, url: &str, body: &Value) -> Result<
         .json(body)
         .send()
         .await
-        .map_err(|e| Error::Upstream { status: 502, message: e.to_string() })?;
+        .map_err(|e| Error::Upstream {
+            status: 502,
+            message: e.to_string(),
+        })?;
     let status = resp.status().as_u16();
     let text = resp.text().await.unwrap_or_default();
     if !(200..300).contains(&status) {
-        return Err(Error::Upstream { status, message: text });
+        return Err(Error::Upstream {
+            status,
+            message: text,
+        });
     }
     serde_json::from_str(&text).map_err(Error::from)
 }
@@ -132,11 +139,17 @@ pub async fn mint_copilot_token(client: &reqwest::Client, github_token: &str) ->
         .header("x-github-api-version", COPILOT_API_VERSION)
         .send()
         .await
-        .map_err(|e| Error::Upstream { status: 502, message: e.to_string() })?;
+        .map_err(|e| Error::Upstream {
+            status: 502,
+            message: e.to_string(),
+        })?;
     let status = resp.status().as_u16();
     let text = resp.text().await.unwrap_or_default();
     if !(200..300).contains(&status) {
-        return Err(Error::Upstream { status, message: text });
+        return Err(Error::Upstream {
+            status,
+            message: text,
+        });
     }
     let v: Value = serde_json::from_str(&text)?;
     Ok(Refreshed {
@@ -168,8 +181,15 @@ pub async fn refresh_kiro(
     )
     .await?;
     Ok(Refreshed {
-        access_token: v["accessToken"].as_str().or_else(|| v["access_token"].as_str()).unwrap_or("").into(),
-        refresh_token: v["refreshToken"].as_str().or_else(|| v["refresh_token"].as_str()).map(String::from),
+        access_token: v["accessToken"]
+            .as_str()
+            .or_else(|| v["access_token"].as_str())
+            .unwrap_or("")
+            .into(),
+        refresh_token: v["refreshToken"]
+            .as_str()
+            .or_else(|| v["refresh_token"].as_str())
+            .map(String::from),
         id_token: None,
         expires_in: v["expiresIn"].as_i64().or_else(|| v["expires_in"].as_i64()),
         extra: Value::Null,
@@ -193,10 +213,17 @@ pub fn codex_parse_id_token(id_token: &str) -> (Option<String>, Option<String>) 
         Ok(v) => v,
         Err(_) => return (None, None),
     };
-    let auth = v.get("https://api.openai.com/auth").cloned().unwrap_or(Value::Null);
+    let auth = v
+        .get("https://api.openai.com/auth")
+        .cloned()
+        .unwrap_or(Value::Null);
     (
-        auth.get("chatgpt_account_id").and_then(Value::as_str).map(String::from),
-        auth.get("chatgpt_plan_type").and_then(Value::as_str).map(String::from),
+        auth.get("chatgpt_account_id")
+            .and_then(Value::as_str)
+            .map(String::from),
+        auth.get("chatgpt_plan_type")
+            .and_then(Value::as_str)
+            .map(String::from),
     )
 }
 
@@ -237,7 +264,10 @@ mod tests {
             br#"{"https://api.openai.com/auth":{"chatgpt_account_id":"acc_1","chatgpt_plan_type":"plus"}}"#,
         );
         let token = format!("h.{payload}.s");
-        assert_eq!(codex_parse_id_token(&token), (Some("acc_1".into()), Some("plus".into())));
+        assert_eq!(
+            codex_parse_id_token(&token),
+            (Some("acc_1".into()), Some("plus".into()))
+        );
         assert_eq!(codex_parse_id_token("bad"), (None, None));
     }
 }
@@ -269,7 +299,12 @@ pub const CODEBUDDY_INTL: CodebuddyProfile = CodebuddyProfile {
 
 /// Cline: POST {refresh_token} JSON to refresh URL.
 pub async fn refresh_cline(client: &reqwest::Client, refresh_token: &str) -> Result<Refreshed> {
-    let v = post_json(client, CLINE_REFRESH_URL, &json!({"refresh_token": refresh_token})).await?;
+    let v = post_json(
+        client,
+        CLINE_REFRESH_URL,
+        &json!({"refresh_token": refresh_token}),
+    )
+    .await?;
     let data = v.get("data").cloned().unwrap_or(v.clone());
     let access = data
         .get("accessToken")
@@ -277,7 +312,10 @@ pub async fn refresh_cline(client: &reqwest::Client, refresh_token: &str) -> Res
         .and_then(Value::as_str)
         .unwrap_or("");
     if access.is_empty() {
-        return Err(Error::Upstream { status: 401, message: "cline refresh returned no token".into() });
+        return Err(Error::Upstream {
+            status: 401,
+            message: "cline refresh returned no token".into(),
+        });
     }
     Ok(Refreshed {
         access_token: access.into(),
@@ -287,7 +325,10 @@ pub async fn refresh_cline(client: &reqwest::Client, refresh_token: &str) -> Res
             .and_then(Value::as_str)
             .map(String::from),
         id_token: None,
-        expires_in: data.get("expiresIn").or_else(|| data.get("expires_in")).and_then(Value::as_i64),
+        expires_in: data
+            .get("expiresIn")
+            .or_else(|| data.get("expires_in"))
+            .and_then(Value::as_i64),
         extra: Value::Null,
     })
 }
@@ -311,24 +352,39 @@ pub async fn refresh_codebuddy(
         .body("{}")
         .send()
         .await
-        .map_err(|e| Error::Upstream { status: 502, message: e.to_string() })?;
+        .map_err(|e| Error::Upstream {
+            status: 502,
+            message: e.to_string(),
+        })?;
     let status = resp.status().as_u16();
     let text = resp.text().await.unwrap_or_default();
     if !(200..300).contains(&status) {
-        return Err(Error::Upstream { status, message: text });
+        return Err(Error::Upstream {
+            status,
+            message: text,
+        });
     }
     let v: Value = serde_json::from_str(&text)?;
     let data = v.get("data").cloned().unwrap_or(Value::Null);
-    let access = data.get("accessToken").and_then(Value::as_str).unwrap_or("");
+    let access = data
+        .get("accessToken")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     if v.get("code").and_then(Value::as_i64) != Some(0) || access.is_empty() {
         return Err(Error::Upstream {
             status: 401,
-            message: format!("codebuddy refresh failed: {}", v.get("msg").and_then(Value::as_str).unwrap_or("no token")),
+            message: format!(
+                "codebuddy refresh failed: {}",
+                v.get("msg").and_then(Value::as_str).unwrap_or("no token")
+            ),
         });
     }
     Ok(Refreshed {
         access_token: access.into(),
-        refresh_token: data.get("refreshToken").and_then(Value::as_str).map(String::from),
+        refresh_token: data
+            .get("refreshToken")
+            .and_then(Value::as_str)
+            .map(String::from),
         id_token: None,
         expires_in: data.get("expiresIn").and_then(Value::as_i64),
         extra: Value::Null,

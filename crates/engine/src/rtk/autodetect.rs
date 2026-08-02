@@ -5,7 +5,7 @@
 use regex::Regex;
 
 use super::filters;
-use super::{DETECT_WINDOW, FilterFn};
+use super::{FilterFn, DETECT_WINDOW};
 
 const SMART_TRUNCATE_MIN_LINES: usize = 250;
 const READ_NUMBERED_MIN_HIT_RATIO: f64 = 0.7;
@@ -15,7 +15,9 @@ fn re(pattern: &str) -> Regex {
 }
 
 fn is_grep_line(line: &str) -> bool {
-    let Some(first) = line.find(':') else { return false };
+    let Some(first) = line.find(':') else {
+        return false;
+    };
     let Some(second_rel) = line[first + 1..].find(':') else {
         return false;
     };
@@ -29,7 +31,8 @@ fn is_path_like(line: &str) -> bool {
         return false;
     }
     let b = t.as_bytes();
-    if b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'\\' || b[2] == b'/') {
+    if b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'\\' || b[2] == b'/')
+    {
         return true;
     }
     if t.contains(':') {
@@ -88,7 +91,11 @@ pub fn auto_detect(text: &str) -> Option<(&'static str, FilterFn)> {
     }
 
     let lines: Vec<&str> = head.lines().collect();
-    let non_empty: Vec<&str> = lines.iter().filter(|l| !l.trim().is_empty()).copied().collect();
+    let non_empty: Vec<&str> = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .copied()
+        .collect();
 
     if non_empty.iter().take(5).any(|l| is_grep_line(l)) {
         return Some(("grep", filters::grep::grep));

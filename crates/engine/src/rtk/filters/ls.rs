@@ -5,10 +5,31 @@ use regex::Regex;
 
 const LS_EXT_SUMMARY_TOP: usize = 5;
 const LS_NOISE_DIRS: &[&str] = &[
-    "node_modules", ".git", "target", "__pycache__", ".next", "dist", "build", ".cache",
-    ".turbo", ".vercel", ".pytest_cache", ".mypy_cache", ".tox", ".venv", "venv", "env",
-    "coverage", ".nyc_output", ".DS_Store", "Thumbs.db", ".idea", ".vscode", ".vs",
-    "*.egg-info", ".eggs",
+    "node_modules",
+    ".git",
+    "target",
+    "__pycache__",
+    ".next",
+    "dist",
+    "build",
+    ".cache",
+    ".turbo",
+    ".vercel",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".tox",
+    ".venv",
+    "venv",
+    "env",
+    "coverage",
+    ".nyc_output",
+    ".DS_Store",
+    "Thumbs.db",
+    ".idea",
+    ".vscode",
+    ".vs",
+    "*.egg-info",
+    ".eggs",
 ];
 
 fn human_size(bytes: u64) -> String {
@@ -28,7 +49,10 @@ struct Parsed {
 }
 
 fn parse_ls_line(line: &str) -> Option<Parsed> {
-    let re = Regex::new(r"\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+(\d{4}|\d{2}:\d{2})\s+").unwrap();
+    let re = Regex::new(
+        r"\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+(\d{4}|\d{2}:\d{2})\s+",
+    )
+    .unwrap();
     let m = re.find(line)?;
     let name = line[m.end()..].to_string();
     let before = &line[..m.start()];
@@ -47,7 +71,11 @@ fn parse_ls_line(line: &str) -> Option<Parsed> {
             }
         }
     }
-    Some(Parsed { file_type, size, name })
+    Some(Parsed {
+        file_type,
+        size,
+        name,
+    })
 }
 
 pub fn ls(input: &str) -> String {
@@ -59,7 +87,9 @@ pub fn ls(input: &str) -> String {
         if line.starts_with("total ") || line.is_empty() {
             continue;
         }
-        let Some(p) = parse_ls_line(line) else { continue };
+        let Some(p) = parse_ls_line(line) else {
+            continue;
+        };
         if p.name == "." || p.name == ".." || LS_NOISE_DIRS.contains(&p.name.as_str()) {
             continue;
         }
@@ -89,12 +119,20 @@ pub fn ls(input: &str) -> String {
     if !by_ext.is_empty() {
         let mut exts: Vec<(String, usize)> = by_ext.into_iter().collect();
         exts.sort_by_key(|(_, c)| std::cmp::Reverse(*c));
-        let parts: Vec<String> = exts.iter().take(LS_EXT_SUMMARY_TOP).map(|(e, c)| format!("{c} {e}")).collect();
-        summary += &format!(" ({}{})", parts.join(", "), if exts.len() > LS_EXT_SUMMARY_TOP {
-            format!(", +{} more)", exts.len() - LS_EXT_SUMMARY_TOP)
-        } else {
-            ")".to_string()
-        });
+        let parts: Vec<String> = exts
+            .iter()
+            .take(LS_EXT_SUMMARY_TOP)
+            .map(|(e, c)| format!("{c} {e}"))
+            .collect();
+        summary += &format!(
+            " ({}{})",
+            parts.join(", "),
+            if exts.len() > LS_EXT_SUMMARY_TOP {
+                format!(", +{} more)", exts.len() - LS_EXT_SUMMARY_TOP)
+            } else {
+                ")".to_string()
+            }
+        );
     }
     out + &summary
 }

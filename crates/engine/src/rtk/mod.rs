@@ -117,8 +117,11 @@ pub fn compress_messages(body: &mut serde_json::Value) -> Option<Stats> {
                         if part.get("type").and_then(Value::as_str) == Some("input_text") {
                             if let Some(t) = part.get("text").and_then(Value::as_str) {
                                 let t = t.to_string();
-                                part["text"] =
-                                    Value::String(compress_text(&t, &mut stats, "openai-responses-array"));
+                                part["text"] = Value::String(compress_text(
+                                    &t,
+                                    &mut stats,
+                                    "openai-responses-array",
+                                ));
                             }
                         }
                     }
@@ -137,13 +140,16 @@ pub fn compress_messages(body: &mut serde_json::Value) -> Option<Stats> {
                     }
                     Value::Array(parts) => {
                         for part in parts.iter_mut() {
-                        if part.get("type").and_then(Value::as_str) == Some("text") {
-                            if let Some(t) = part.get("text").and_then(Value::as_str) {
-                                let t = t.to_string();
-                                part["text"] =
-                                    Value::String(compress_text(&t, &mut stats, "openai-tool-array"));
+                            if part.get("type").and_then(Value::as_str) == Some("text") {
+                                if let Some(t) = part.get("text").and_then(Value::as_str) {
+                                    let t = t.to_string();
+                                    part["text"] = Value::String(compress_text(
+                                        &t,
+                                        &mut stats,
+                                        "openai-tool-array",
+                                    ));
+                                }
                             }
-                        }
                         }
                     }
                     _ => {}
@@ -165,7 +171,8 @@ pub fn compress_messages(body: &mut serde_json::Value) -> Option<Stats> {
             match block.get_mut("content") {
                 Some(Value::String(s)) => {
                     let s = s.clone();
-                    block["content"] = Value::String(compress_text(&s, &mut stats, "claude-string"));
+                    block["content"] =
+                        Value::String(compress_text(&s, &mut stats, "claude-string"));
                 }
                 Some(Value::Array(parts)) => {
                     for part in parts.iter_mut() {
