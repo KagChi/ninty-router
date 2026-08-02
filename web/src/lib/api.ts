@@ -34,4 +34,5 @@ export interface ApiKey {
   allowed_models: string[];
   limit_reset_at: string | null;
   created_at: string;
+  used?: number;
 }

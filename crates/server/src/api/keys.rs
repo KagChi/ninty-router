@@ -24,7 +24,17 @@ async fn list_keys(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_session(&state, &headers).await?;
     let keys = api_keys::list(&state.db).await?;
-    Ok(Json(json!({"keys": keys})))
+    // Attach window usage so UI can render progress bars (9router endpoint page).
+    let mut out = Vec::with_capacity(keys.len());
+    for k in keys {
+        let used = crate::repos::usage::key_usage_since(&state.db, &k.key, k.limit_reset_at.clone())
+            .await
+            .unwrap_or(0);
+        let mut v = serde_json::to_value(&k)?;
+        v["used"] = json!(used);
+        out.push(v);
+    }
+    Ok(Json(json!({"keys": out})))
 }
 
 async fn create_key(
