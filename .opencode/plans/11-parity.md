@@ -167,3 +167,9 @@ live e2e against running server where credentials/mocks allow.
   key rows w/ progress bars (used via key_usage_since), pause/resume, reset,
   create/edit modals (limit/window/RPM/allowed-models picker), Created dialog.
   Chat enforcement already present (401 paused, 429 limit, allowed_models).
+- 2026-08-02: **P5 DONE** (1db67b8) — toast system, test-batch + results modal,
+  sticky Header w/ ref strings + theme/shutdown/logout menu (+shutdown endpoint),
+  combos blurb + model picker, usage filters (provider/dates in SQL), Change
+  Password card (+password_hash leak fix), Show-all expander after 20.
+  **11-parity plan COMPLETE (P1–P5).** Deferred per plan: Cloudflare Tunnel,
+  Tailscale, Token Limit Settings card, public /usage-check, node detail page.
