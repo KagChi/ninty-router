@@ -1,8 +1,10 @@
 # 10 — CI/CD + Docker
 
-Status: scaffolding DONE — `Dockerfile`, `.dockerignore`, `docker-compose.yml`,
-`.github/workflows/{ci,release}.yml`, `scripts/{build,dev}.sh` exist in repo.
-Remaining work is only verification once milestones 01+ produce the workspace.
+Status: DONE. All 5 CI jobs green on main (fmt, clippy, test, web build, docker build —
+run 30745445380). Dockerfile embed path fixed (web/.output/public, matches rust-embed
+folder). PORT/HOST env wired via clap env. Release workflow (binaries ×4 + GHCR
+multi-arch) is tag-triggered (v*) — verified by inspection, not yet executed; first tag
+will exercise it.
 
 ## Goal
 
