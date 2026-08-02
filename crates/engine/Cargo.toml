@@ -1,0 +1,27 @@
+[package]
+name = "engine"
+description = "ninty-router routing engine (translator, rtk, fallback, oauth)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ninty-core = { path = "../core" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+chrono.workspace = true
+jsonwebtoken = "9"
+regex = "1"
+base64 = "0.22"
+sha2 = "0.10"
+rsa = { version = "0.9", features = ["sha2"] }
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+md5 = "0.7"
+rand = "0.8"
+uuid.workspace = true
+hex = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }

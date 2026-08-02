@@ -1,0 +1,17 @@
+services:
+  ninty-router:
+    build: .
+    image: ninty-router:local
+    ports:
+      - "20128:20128"
+    volumes:
+      - ninty-data:/data
+    environment:
+      # API_KEY_SECRET: change-me
+      HOST: 0.0.0.0
+      PORT: 20128
+      DATA_DIR: /data
+    restart: unless-stopped
+
+volumes:
+  ninty-data:

@@ -1,0 +1,7 @@
+/target
+**/node_modules
+web/dist
+web/.output
+web/.vinxi
+*.log
+.DS_Store
