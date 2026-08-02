@@ -133,29 +133,52 @@ async fn test_connection(
         .ok_or_else(|| ninty_core::error::Error::NotFound("connection".into()))?;
     let provider = registry::find_provider(&conn.provider)
         .ok_or_else(|| ninty_core::error::Error::NotFound("provider".into()))?;
+    if provider.id == "qoder" {
+        return Ok(Json(json!({"ok": false, "message": "test not supported for qoder (COSY signing)"})));
+    }
     let model = provider.models.first().map(|m| m.id).unwrap_or("test");
-    let upstream_model = provider
-        .models
-        .first()
-        .and_then(|m| m.upstream_model_id)
-        .unwrap_or(model);
+    let spec = format!("{}/{model}", provider.id);
 
-    let body = json!({
-        "model": upstream_model,
-        "messages": [{"role": "user", "content": "ping"}],
-        "max_tokens": 1,
-        "stream": false,
-    });
+    // Same target + URL + auth pipeline the chat path uses — transport-aware
+    // (x-api-key / query key / vertex SA / cline workos / oauth refresh).
+    let targets = crate::v1::chat::resolve_targets(&state, &spec, registry::WireFormat::Openai)
+        .await
+        .map_err(ApiError::from)?;
+    let Some(target) = targets.iter().find(|t| t.conn_id.as_deref() == Some(id.as_str())) else {
+        return Ok(Json(json!({"ok": false, "message": "connection not eligible (disabled, locked, or missing credentials)"})));
+    };
+    let (url, headers) = crate::v1::chat::build_url_and_auth(&state, target, false)
+        .await
+        .map_err(ApiError::from)?;
+
+    let body = match target.format {
+        registry::WireFormat::Claude => json!({
+            "model": target.model,
+            "max_tokens": 1,
+            "messages": [{"role": "user", "content": "ping"}],
+        }),
+        registry::WireFormat::Gemini => json!({
+            "contents": [{"role": "user", "parts": [{"text": "ping"}]}],
+        }),
+        registry::WireFormat::Responses => json!({
+            "model": target.model,
+            "input": "ping",
+        }),
+        registry::WireFormat::Openai => json!({
+            "model": target.model,
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 1,
+            "stream": false,
+        }),
+    };
+
     let mut req = state
         .http
-        .post(provider.transport.base_url)
+        .post(&url)
         .timeout(std::time::Duration::from_secs(30))
         .header("content-type", "application/json");
-    if let Some(key) = conn.api_key() {
-        req = req.bearer_auth(key);
-    }
-    for (k, v) in provider.transport.headers {
-        req = req.header(*k, *v);
+    for (k, v) in &headers {
+        req = req.header(k, v);
     }
     let (status, message) = match req.json(&body).send().await {
         Ok(resp) => {
@@ -183,9 +206,8 @@ async fn test_connection(
         },
     )
     .await?;
-    Ok(Json(
-        json!({"ok": ok, "status": status, "message": message}),
-    ))
+
+    Ok(Json(json!({ "ok": ok, "status": status, "message": message })))
 }
 
 async fn list_nodes(

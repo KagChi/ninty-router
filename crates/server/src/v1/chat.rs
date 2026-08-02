@@ -813,29 +813,29 @@ fn serialize_event(format: Format, ev: &Value, model: &str) -> String {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-struct Target {
-    conn_id: Option<String>,
-    provider_id: String,
-    base_url: String,
-    url_override: Option<String>,
-    format: WireFormat,
-    auth: AuthStyle,
-    credential: String,
-    headers: Vec<(String, String)>,
-    model: String,
-    timeout_ms: u64,
-    url_style: UrlStyle,
-    url_suffix: String,
-    backoff_level: u32,
-    force_stream: bool,
-    oauth_refresh: bool,
-    qoder_creds: Option<engine::qoder::CosyCreds>,
-    vertex_sa: Option<String>,
-    vertex_project: Option<String>,
-    vertex_location: Option<String>,
+pub(crate) struct Target {
+    pub(crate) conn_id: Option<String>,
+    pub(crate) provider_id: String,
+    pub(crate) base_url: String,
+    pub(crate) url_override: Option<String>,
+    pub(crate) format: WireFormat,
+    pub(crate) auth: AuthStyle,
+    pub(crate) credential: String,
+    pub(crate) headers: Vec<(String, String)>,
+    pub(crate) model: String,
+    pub(crate) timeout_ms: u64,
+    pub(crate) url_style: UrlStyle,
+    pub(crate) url_suffix: String,
+    pub(crate) backoff_level: u32,
+    pub(crate) force_stream: bool,
+    pub(crate) oauth_refresh: bool,
+    pub(crate) qoder_creds: Option<engine::qoder::CosyCreds>,
+    pub(crate) vertex_sa: Option<String>,
+    pub(crate) vertex_project: Option<String>,
+    pub(crate) vertex_location: Option<String>,
 }
 
-async fn resolve_targets(
+pub(crate) async fn resolve_targets(
     state: &Arc<AppState>,
     spec: &str,
     client_format: WireFormat,
@@ -1108,7 +1108,7 @@ async fn resolve_targets(
     Ok(targets)
 }
 
-async fn build_url_and_auth(
+pub(crate) async fn build_url_and_auth(
     state: &Arc<AppState>,
     target: &Target,
     stream: bool,
