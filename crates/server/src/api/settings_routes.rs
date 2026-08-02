@@ -34,5 +34,6 @@ async fn patch_settings(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_session(&state, &headers).await?;
     let updated = crate::repos::settings::patch(&state.db, patch).await?;
+    state.set_request_logs(updated.enable_request_logs);
     Ok(Json(serde_json::to_value(updated)?))
 }

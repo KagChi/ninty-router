@@ -190,6 +190,14 @@ impl Db {
     }
 
     /// Sync variant for non-async contexts (startup, tests).
+    /// Flush WAL to the main db file (graceful shutdown).
+    pub fn checkpoint(&self) -> Result<()> {
+        self.call_sync(|conn| {
+            conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+                .map_err(|e| ninty_core::error::Error::Db(e.to_string()))
+        })
+    }
+
     pub fn call_sync<F, T>(&self, f: F) -> Result<T>
     where
         F: FnOnce(&Connection) -> Result<T>,

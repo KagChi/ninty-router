@@ -4,6 +4,7 @@ pub mod codex_instructions;
 pub mod executor;
 pub mod fallback;
 pub mod oauth;
+pub mod pxpipe;
 pub mod qoder;
 pub mod quota;
 pub mod rtk;

@@ -13,6 +13,7 @@ use engine::executor::retry_config_for;
 use engine::fallback::{self, Verdict};
 use engine::sse::SseParser;
 use engine::translator::{self, Format};
+use ninty_core::config;
 use ninty_core::error::Error;
 use ninty_core::registry::{self, AuthStyle, UrlStyle, WireFormat};
 use serde_json::{json, Value};
@@ -132,6 +133,7 @@ pub(crate) async fn run(
                     0,
                     "error",
                     Some("rate_limit"),
+                    None,
                 )
                 .await;
                 return Err(ApiError(Error::Upstream {
@@ -248,6 +250,7 @@ async fn run_single(
             .map(|v| v.eq_ignore_ascii_case("off"))
             .unwrap_or(false);
         let mut rtk_saved: i64 = 0;
+        let mut pxpipe_summary: Option<engine::pxpipe::PxpipeSummary> = None;
         if !saver_off {
             let s = settings::get(&state.db).await.unwrap_or_default();
             if s.rtk_enabled {
@@ -266,7 +269,38 @@ async fn run_single(
                     engine::savers::inject_system_prompt(&mut body_out, up_fmt, &p);
                 }
             }
+            // PXPIPE: image bulky context (Claude-format bodies only), last saver
+            // before dispatch. Fail-open: errors/timeouts leave body untouched.
+            if s.pxpipe_enabled && up_fmt == Format::Claude {
+                let opts = engine::pxpipe::PxpipeOpts {
+                    enabled: true,
+                    min_chars: s.pxpipe_min_chars,
+                    timeout_ms: s.pxpipe_timeout_ms,
+                    model: target.model.clone(),
+                };
+                let (new_body, summary) =
+                    engine::pxpipe::compress_with_pxpipe(&body_out, &opts, &config::data_dir())
+                        .await;
+                if let Some(b) = new_body {
+                    body_out = b;
+                }
+                if let Some(line) = engine::pxpipe::format_pxpipe_log(&summary) {
+                    tracing::info!("PXPIPE {line}");
+                }
+                if summary.applied {
+                    pxpipe_summary = Some(summary);
+                }
+            }
         }
+
+        let detail_ctx = state.enable_request_logs().then(|| DetailCtx {
+            request: truncate_body(body),
+            provider_request: truncate_body(&body_out),
+            started: std::time::Instant::now(),
+            pxpipe: pxpipe_summary
+                .as_ref()
+                .and_then(|p| serde_json::to_value(p).ok()),
+        });
 
         let (url, headers) = match build_url_and_auth(state, &target, stream).await {
             Ok(v) => v,
@@ -293,6 +327,7 @@ async fn run_single(
                             0,
                             "error",
                             None,
+                            detail_ctx.as_ref(),
                         )
                         .await;
                         last = Some((status, text));
@@ -358,6 +393,7 @@ async fn run_single(
                         0,
                         "error",
                         None,
+                        detail_ctx.as_ref(),
                     )
                     .await;
                     last = Some((status, text));
@@ -381,12 +417,35 @@ async fn run_single(
             key_str,
             rtk_saved,
             resp,
+            detail_ctx,
         )
         .await);
     }
 
     let (status, text) = last.unwrap_or((503, format!("no accounts available for '{spec}'")));
     Err((status, text, Verdict::Fallback { cooldown_ms: 0 }))
+}
+
+/// Request-log context: bodies captured post-savers (final upstream body),
+/// truncated to 64KB each, secrets never included (bodies only, no auth headers).
+struct DetailCtx {
+    request: Value,
+    provider_request: Value,
+    started: std::time::Instant,
+    pxpipe: Option<Value>,
+}
+
+const DETAIL_BODY_CAP: usize = 64 * 1024;
+
+/// Truncate a JSON value's serialized form to cap bytes; returns {truncated, head}
+/// marker when over. Bodies only ever carry user content — auth headers are never
+/// part of this path (secrets redacted by construction).
+fn truncate_body(v: &Value) -> Value {
+    let s = v.to_string();
+    if s.len() <= DETAIL_BODY_CAP {
+        return v.clone();
+    }
+    json!({"truncated": true, "chars": s.len(), "head": &s[..DETAIL_BODY_CAP]})
 }
 
 fn judge(text: &str, status: u16, backoff_level: u32) -> Verdict {
@@ -423,6 +482,7 @@ async fn finish(
     key_str: &Option<String>,
     rtk_saved: i64,
     resp: reqwest::Response,
+    detail_ctx: Option<DetailCtx>,
 ) -> Response {
     let request_model = body
         .get("model")
@@ -441,6 +501,7 @@ async fn finish(
             rtk_saved,
             &request_model,
             resp,
+            detail_ctx,
         )
         .await;
     }
@@ -477,6 +538,7 @@ async fn finish(
             "success",
             None,
             rtk_saved,
+            detail_ctx.as_ref(),
         )
         .await;
         return Json(out).into_response();
@@ -501,6 +563,8 @@ async fn finish(
         key_str.clone(),
         endpoint,
     );
+    let request_logs = state.enable_request_logs();
+    let mut detail_ctx = detail_ctx;
     let counted = CountingStream::new(rx, move |total_bytes| {
         let estimate = total_bytes / 4;
         let db = db.clone();
@@ -510,14 +574,15 @@ async fn finish(
             model.clone(),
             key.clone(),
         );
+        let ctx = detail_ctx.take();
         tokio::spawn(async move {
             let meta = (rtk_saved > 0).then(|| json!({"rtk_saved_bytes": rtk_saved}));
             let _ = usage::record(
                 &db,
                 usage::UsageRecord {
-                    provider,
-                    model,
-                    connection_id: conn_id,
+                    provider: provider.clone(),
+                    model: model.clone(),
+                    connection_id: conn_id.clone(),
                     api_key: key,
                     endpoint: ep.into(),
                     prompt_tokens: 0,
@@ -528,6 +593,32 @@ async fn finish(
                 },
             )
             .await;
+            if request_logs {
+                let extra = ctx.map(|c| {
+                    let mut m = json!({
+                        "request": c.request,
+                        "providerRequest": c.provider_request,
+                        "latencyMs": c.started.elapsed().as_millis() as u64,
+                    });
+                    if let Some(p) = &c.pxpipe {
+                        m["pxpipe"] = p.clone();
+                    }
+                    m
+                });
+                let _ = usage::insert_request_detail(
+                    &db,
+                    usage::RequestDetail {
+                        provider,
+                        model,
+                        status: "success".into(),
+                        input_tokens: 0,
+                        output_tokens: estimate as i64,
+                        endpoint: ep.into(),
+                        extra,
+                    },
+                )
+                .await;
+            }
         });
     });
 
@@ -1266,6 +1357,7 @@ async fn record_meta(
     status: &str,
     error_kind: Option<&str>,
     rtk_saved: i64,
+    ctx: Option<&DetailCtx>,
 ) {
     let meta = match (error_kind, rtk_saved > 0) {
         (Some(k), true) => Some(json!({"error_kind": k, "rtk_saved_bytes": rtk_saved})),
@@ -1287,6 +1379,17 @@ async fn record_meta(
     };
     let _ = usage::record(&state.db, rec).await;
     if state.enable_request_logs() {
+        let extra = ctx.map(|c| {
+            let mut m = json!({
+                "request": c.request,
+                "providerRequest": c.provider_request,
+                "latencyMs": c.started.elapsed().as_millis() as u64,
+            });
+            if let Some(p) = &c.pxpipe {
+                m["pxpipe"] = p.clone();
+            }
+            m
+        });
         let _ = usage::insert_request_detail(
             &state.db,
             usage::RequestDetail {
@@ -1296,6 +1399,7 @@ async fn record_meta(
                 input_tokens: prompt,
                 output_tokens: completion,
                 endpoint: endpoint.into(),
+                extra,
             },
         )
         .await;
@@ -1314,6 +1418,7 @@ async fn record(
     completion: i64,
     status: &str,
     error_kind: Option<&str>,
+    ctx: Option<&DetailCtx>,
 ) {
     let meta = error_kind.map(|k| json!({"error_kind": k}));
     let rec = usage::UsageRecord {
@@ -1330,6 +1435,17 @@ async fn record(
     };
     let _ = usage::record(&state.db, rec).await;
     if state.enable_request_logs() {
+        let extra = ctx.map(|c| {
+            let mut m = json!({
+                "request": c.request,
+                "providerRequest": c.provider_request,
+                "latencyMs": c.started.elapsed().as_millis() as u64,
+            });
+            if let Some(p) = &c.pxpipe {
+                m["pxpipe"] = p.clone();
+            }
+            m
+        });
         let _ = usage::insert_request_detail(
             &state.db,
             usage::RequestDetail {
@@ -1339,6 +1455,7 @@ async fn record(
                 input_tokens: prompt,
                 output_tokens: completion,
                 endpoint: endpoint.into(),
+                extra,
             },
         )
         .await;
@@ -1412,6 +1529,7 @@ async fn collect_forced_stream(
     rtk_saved: i64,
     request_model: &str,
     resp: reqwest::Response,
+    detail_ctx: Option<DetailCtx>,
 ) -> Response {
     use futures::StreamExt;
     let mut parser = SseParser::new();
@@ -1481,6 +1599,7 @@ async fn collect_forced_stream(
         "success",
         None,
         rtk_saved,
+        detail_ctx.as_ref(),
     )
     .await;
     Json(out).into_response()
@@ -1804,6 +1923,7 @@ async fn collect_qoder(
         "success",
         None,
         0,
+        None,
     )
     .await;
     Ok(Json(out).into_response())

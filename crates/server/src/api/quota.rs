@@ -15,7 +15,57 @@ use engine::quota::{self, QuotaReport};
 const CACHE_TTL_S: i64 = 300;
 
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new().route("/quota", get(all_quota))
+    Router::new()
+        .route("/quota", get(all_quota))
+        .route("/request-logs", get(request_logs))
+        .route("/stats", get(stats))
+        .route("/history", get(history))
+        .route("/providers", get(providers))
+}
+
+/// GET /api/usage/request-logs?limit= — newest first (ring buffer cap 1000).
+async fn request_logs(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<Json<Value>, ApiError> {
+    super::require_session(&state, &headers).await?;
+    let limit: i64 = q.get("limit").and_then(|v| v.parse().ok()).unwrap_or(200);
+    let rows = crate::repos::usage::list_request_details(&state.db, limit).await?;
+    Ok(Json(serde_json::json!({ "logs": rows })))
+}
+
+/// GET /api/usage/stats — totals + today + per-model breakdown.
+async fn stats(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, ApiError> {
+    super::require_session(&state, &headers).await?;
+    Ok(Json(crate::repos::usage::stats(&state.db).await?))
+}
+
+/// GET /api/usage/history?days= — tokens/day for charts.
+async fn history(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<Json<Value>, ApiError> {
+    super::require_session(&state, &headers).await?;
+    let days: i64 = q.get("days").and_then(|v| v.parse().ok()).unwrap_or(30);
+    Ok(Json(
+        serde_json::json!({ "days": crate::repos::usage::history(&state.db, days).await? }),
+    ))
+}
+
+/// GET /api/usage/providers — per-provider aggregates.
+async fn providers(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, ApiError> {
+    super::require_session(&state, &headers).await?;
+    Ok(Json(
+        serde_json::json!({ "providers": crate::repos::usage::by_provider(&state.db).await? }),
+    ))
 }
 
 async fn cache_get(state: &Arc<AppState>, key: &str) -> Option<Value> {

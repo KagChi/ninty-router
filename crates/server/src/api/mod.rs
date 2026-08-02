@@ -3,6 +3,7 @@ mod combos;
 mod keys;
 mod oauth;
 mod providers;
+mod pxpipe;
 mod quota;
 mod settings_routes;
 
@@ -28,6 +29,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .nest("/usage", quota::router())
         .nest("/keys", keys::router())
         .nest("/providers", providers::router())
+        .nest("/pxpipe", pxpipe::router())
         .with_state(state.clone());
 
     Router::new()

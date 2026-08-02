@@ -6,11 +6,21 @@ interface Settings {
   caveman_enabled: boolean;
   ponytail_enabled: boolean;
   ponytail_level: string;
+  pxpipe_enabled: boolean;
+  pxpipe_min_chars: number;
+  pxpipe_timeout_ms: number;
   require_api_key: boolean;
   require_login: boolean;
   enable_request_logs: boolean;
   sticky_round_robin_limit: number;
   [k: string]: unknown;
+}
+
+interface PxpipeStatus {
+  installed: boolean;
+  installing: boolean;
+  version: string | null;
+  npmAvailable: boolean;
 }
 
 export default function SettingsPage() {
@@ -36,6 +46,20 @@ export default function SettingsPage() {
     const cur = settings();
     if (!cur) return;
     patch({ [key]: !cur[key] });
+  };
+
+  const [pxpipe, { refetch: refetchPxpipe }] = createResource(async () =>
+    api<PxpipeStatus>("/pxpipe/status")
+  );
+  const installPxpipe = async () => {
+    await api("/pxpipe/install", { method: "POST" });
+    // install runs server-side in background; poll status
+    const t = setInterval(async () => {
+      await refetchPxpipe();
+      const st = pxpipe();
+      if (st && !st.installing) clearInterval(t);
+    }, 3000);
+    setTimeout(() => clearInterval(t), 5 * 60 * 1000 + 5000);
   };
 
   return (
@@ -101,6 +125,71 @@ export default function SettingsPage() {
                   <option value="ultra">ultra</option>
                 </select>
               </label>
+
+              <hr class="my-3 border-border" />
+
+              <label class="mb-3 flex items-center justify-between text-sm">
+                <span>
+                  PXPIPE
+                  <span class="block text-xs text-text-muted">
+                    Render bulky Claude-format context as dense images (cheaper tokens). Requires
+                    pxpipe-proxy install + node/bun.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={s().pxpipe_enabled}
+                  onChange={() => toggle("pxpipe_enabled")}
+                />
+              </label>
+
+              <Show when={s().pxpipe_enabled}>
+                <label class="mb-3 flex items-center justify-between text-sm">
+                  <span>Min chars (gate)</span>
+                  <input
+                    type="number"
+                    min="1000"
+                    step="1000"
+                    class="w-28 rounded border border-border bg-bg px-2 py-1 text-sm"
+                    value={s().pxpipe_min_chars}
+                    onChange={(e) =>
+                      patch({ pxpipe_min_chars: Number(e.currentTarget.value) || 25000 })
+                    }
+                  />
+                </label>
+                <label class="mb-3 flex items-center justify-between text-sm">
+                  <span>Timeout (ms)</span>
+                  <input
+                    type="number"
+                    min="1000"
+                    step="1000"
+                    class="w-28 rounded border border-border bg-bg px-2 py-1 text-sm"
+                    value={s().pxpipe_timeout_ms}
+                    onChange={(e) =>
+                      patch({ pxpipe_timeout_ms: Number(e.currentTarget.value) || 15000 })
+                    }
+                  />
+                </label>
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-xs text-text-muted">
+                    {pxpipe()?.installed
+                      ? `pxpipe-proxy v${pxpipe()?.version ?? "?"} installed`
+                      : pxpipe()?.installing
+                        ? "installing…"
+                        : pxpipe()?.npmAvailable
+                          ? "not installed"
+                          : "no JS runtime (node/bun) found"}
+                  </span>
+                  <Show when={!pxpipe()?.installed && !pxpipe()?.installing}>
+                    <button
+                      class="rounded border border-border px-2 py-1 text-xs hover:bg-bg"
+                      onClick={installPxpipe}
+                    >
+                      Install pxpipe-proxy
+                    </button>
+                  </Show>
+                </div>
+              </Show>
 
               <p class="mt-3 text-xs text-text-muted">
                 Per-request bypass: header <code>x-9router-token-saver: off</code>. Savings are

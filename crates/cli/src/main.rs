@@ -38,11 +38,24 @@ async fn main() -> ExitCode {
         }
     };
 
+    // Port conflict detection: fail fast with a clear message instead of an
+    // opaque bind error deep in axum.
+    if std::net::TcpListener::bind((args.host.as_str(), args.port)).is_err() {
+        eprintln!("port {}:{} already in use — is ninty-router already running?", args.host, args.port);
+        eprintln!("pick another port with --port <n>");
+        return ExitCode::FAILURE;
+    }
+
     let state = Arc::new(server::state::AppState::new(db));
+    if let Ok(s) = server::repos::settings::get(&state.db).await {
+        state.set_request_logs(s.enable_request_logs);
+    }
 
     println!("ninty-router");
     println!("  dashboard:  http://{}:{}/", args.host, args.port);
     println!("  openai api: http://{}:{}/v1", args.host, args.port);
+    println!("  claude api: http://{}:{}/v1/messages", args.host, args.port);
+    println!("  gemini api: http://{}:{}/v1beta", args.host, args.port);
     println!("  data dir:   {}", ninty_core::config::data_dir().display());
 
     if !args.no_browser {
