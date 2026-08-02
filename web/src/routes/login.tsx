@@ -1,6 +1,7 @@
 import { useNavigate } from "@solidjs/router";
-import { createSignal } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import { api } from "~/lib/api";
+import { Button, Icon, Input } from "~/components/ui";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -26,29 +27,33 @@ export default function Login() {
   };
 
   return (
-    <div class="flex min-h-screen items-center justify-center">
-      <form
-        onSubmit={submit}
-        class="w-80 rounded-lg border border-border bg-surface p-6"
-      >
-        <h1 class="mb-1 text-lg font-semibold">ninty-router</h1>
-        <p class="mb-4 text-sm text-text-muted">Dashboard login</p>
-        <input
-          type="password"
-          placeholder="password"
-          value={password()}
-          onInput={(e) => setPassword(e.currentTarget.value)}
-          class="mb-3 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-primary"
-          autofocus
-        />
-        <button
-          type="submit"
-          disabled={busy()}
-          class="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {busy() ? "…" : "Login"}
-        </button>
-        {error() && <p class="mt-3 text-sm text-danger">{error()}</p>}
+    <div class="flex min-h-screen items-center justify-center bg-bg p-4">
+      <form onSubmit={submit} class="card-elev w-80 border border-border p-8">
+        <div class="mb-6 flex items-center gap-3">
+          <div class="flex size-9 items-center justify-center rounded-[10px] bg-gradient-to-br from-brand-500 to-brand-700 shadow-[var(--shadow-warm)]">
+            <Icon name="hub" class="text-[20px] text-white" />
+          </div>
+          <div>
+            <h1 class="text-lg font-semibold tracking-tight text-text-main">ninty-router</h1>
+            <p class="text-xs text-text-muted">Dashboard login</p>
+          </div>
+        </div>
+        <div class="mb-4">
+          <Input
+            type="password"
+            placeholder="password"
+            value={password()}
+            onInput={setPassword}
+          />
+        </div>
+        <Button type="submit" fullWidth loading={busy()}>
+          Login
+        </Button>
+        <Show when={error()}>
+          <p class="mt-3 flex items-center gap-1.5 text-sm text-danger">
+            <Icon name="error" class="text-[16px]" /> {error()}
+          </p>
+        </Show>
       </form>
     </div>
   );

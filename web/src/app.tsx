@@ -32,10 +32,12 @@ function Shell(props: { children: unknown }) {
             return null;
           }
           return (
-            <div class="flex min-h-screen">
+            <div class="flex h-screen w-full overflow-hidden bg-bg">
               <Sidebar />
-              <main class="flex-1 p-6 max-w-6xl">
-                <Suspense>{props.children}</Suspense>
+              <main class="flex-1 overflow-y-auto">
+                <div class="mx-auto max-w-5xl p-6 lg:p-8">
+                  <Suspense>{props.children}</Suspense>
+                </div>
               </main>
             </div>
           );

@@ -1,5 +1,6 @@
 import { For, Show, createResource, createSignal } from "solid-js";
 import { api } from "~/lib/api";
+import { Badge, Button, Card, Icon, Input, PageHeader, Select, Textarea } from "~/components/ui";
 
 interface Combo {
   id: string;
@@ -61,48 +62,36 @@ export default function Combos() {
 
   return (
     <div>
-      <h1 class="mb-4 text-xl font-semibold">Combos</h1>
-      <p class="mb-4 text-sm text-text-muted">
-        A combo name can be used as the <code>model</code> in API requests. Models are tried in
-        order; fallbackable errors move to the next. One model per line, e.g.{" "}
-        <code>openai/gpt-4o</code>.
-      </p>
+      <PageHeader
+        title="Combos"
+        subtitle="A combo name works as the model in API requests — models are tried in order, fallbackable errors move to the next"
+      />
 
-      <div class="mb-6 rounded-lg border border-border bg-surface p-4">
-        <div class="mb-2 flex gap-2">
-          <input
-            class="w-56 rounded border border-border bg-bg px-2 py-1 text-sm"
-            placeholder="combo name"
-            value={name()}
-            onInput={(e) => setName(e.currentTarget.value)}
-          />
-          <select
-            class="rounded border border-border bg-bg px-2 py-1 text-sm"
-            value={kind()}
-            onChange={(e) => setKind(e.currentTarget.value)}
-          >
+      <Card title={editing() ? `Edit ${editing()}` : "New combo"} icon="layers" class="mb-6">
+        <div class="mb-3 flex gap-2">
+          <div class="w-56">
+            <Input placeholder="combo name" value={name()} onInput={setName} />
+          </div>
+          <Select value={kind()} onChange={setKind}>
             <option value="general">general</option>
             <option value="vision">vision</option>
             <option value="tools">tools</option>
             <option value="free">free</option>
-          </select>
+          </Select>
         </div>
-        <textarea
-          class="mb-2 h-32 w-full rounded border border-border bg-bg px-2 py-1 font-mono text-sm"
-          placeholder={"openai/gpt-4o\nanthropic/claude-sonnet-4-5-20250929"}
+        <Textarea
+          rows={6}
+          class="mb-3 font-mono"
+          placeholder={"openrouter/gpt-4o\nglm/glm-4.6 — one model per line"}
           value={modelsText()}
-          onInput={(e) => setModelsText(e.currentTarget.value)}
+          onInput={setModelsText}
         />
-        <div class="flex items-center gap-3">
-          <button
-            class="rounded bg-primary px-3 py-1 text-sm font-medium text-black"
-            onClick={save}
-          >
-            {editing() ? "Update" : "Create"}
-          </button>
+        <div class="flex items-center gap-2">
+          <Button size="sm" onClick={save}>{editing() ? "Update" : "Create"}</Button>
           <Show when={editing()}>
-            <button
-              class="text-sm text-text-muted"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => {
                 setEditing(null);
                 setName("");
@@ -110,38 +99,34 @@ export default function Combos() {
               }}
             >
               cancel
-            </button>
+            </Button>
           </Show>
           <Show when={error()}>
-            <span class="text-sm text-red-400">{error()}</span>
+            <span class="flex items-center gap-1.5 text-sm text-danger">
+              <Icon name="error" class="text-[16px]" /> {error()}
+            </span>
           </Show>
         </div>
-      </div>
+      </Card>
 
       <Show when={combos()} fallback={<p class="text-sm text-text-muted">Loading…</p>}>
         <For each={combos()}>
           {(c) => (
-            <div class="mb-2 flex items-start justify-between rounded-lg border border-border bg-surface p-4">
+            <Card padding="sm" class="mb-2 flex items-start justify-between">
               <div>
-                <div class="font-medium">
+                <div class="font-semibold text-text-main">
                   {c.name}
-                  <span class="ml-2 rounded bg-bg px-1.5 py-0.5 text-xs text-text-muted">
-                    {c.kind ?? "general"}
-                  </span>
+                  <Badge tone="brand">{c.kind ?? "general"}</Badge>
                 </div>
                 <ol class="mt-1 list-decimal pl-5 font-mono text-sm text-text-muted">
                   <For each={c.models}>{(m) => <li>{m}</li>}</For>
                 </ol>
               </div>
-              <div class="flex gap-3 text-sm">
-                <button class="text-primary" onClick={() => edit(c)}>
-                  edit
-                </button>
-                <button class="text-red-400" onClick={() => remove(c.id)}>
-                  delete
-                </button>
+              <div class="flex gap-1">
+                <Button variant="ghost" size="sm" icon="edit" onClick={() => edit(c)} />
+                <Button variant="ghost" size="sm" icon="delete" class="text-danger" onClick={() => remove(c.id)} />
               </div>
-            </div>
+            </Card>
           )}
         </For>
       </Show>

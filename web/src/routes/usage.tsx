@@ -1,5 +1,6 @@
 import { For, Show, createResource, createSignal } from "solid-js";
 import { api } from "~/lib/api";
+import { Badge, Button, Card, PageHeader, SegmentedControl } from "~/components/ui";
 
 interface Stats {
   total: { requests: number; input: number; output: number };
@@ -81,58 +82,54 @@ export default function UsagePage() {
 
   return (
     <div>
-      <div class="mb-4 flex items-center gap-4">
-        <h1 class="text-xl font-semibold">Usage</h1>
-        <div class="flex gap-1 text-sm">
-          <button
-            class={`rounded px-3 py-1 ${tab() === "overview" ? "bg-surface font-medium" : "text-text-muted"}`}
-            onClick={() => setTab("overview")}
-          >
-            Overview
-          </button>
-          <button
-            class={`rounded px-3 py-1 ${tab() === "logs" ? "bg-surface font-medium" : "text-text-muted"}`}
-            onClick={() => setTab("logs")}
-          >
-            Request Details
-          </button>
-        </div>
-        <div class="ml-auto">
-          <button class="rounded border border-border px-2 py-1 text-xs hover:bg-surface" onClick={exportCsv}>
+      <PageHeader
+        title="Usage"
+        subtitle="Tokens routed per day — “cost” here means savings vs paid APIs"
+        actions={
+          <Button variant="secondary" size="sm" icon="download" onClick={exportCsv}>
             Export CSV
-          </button>
-        </div>
+          </Button>
+        }
+      />
+      <div class="mb-4">
+        <SegmentedControl
+          options={[
+            { value: "overview", label: "Overview" },
+            { value: "logs", label: "Request Details" },
+          ]}
+          value={tab()}
+          onChange={setTab}
+        />
       </div>
 
       <Show when={tab() === "overview"}>
         <Show when={stats()} fallback={<p class="text-sm text-text-muted">Loading…</p>}>
           {(s) => (
             <div class="space-y-6">
-              <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <div class="rounded-lg border border-border bg-surface p-3">
+              <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <Card padding="sm">
                   <div class="text-xs text-text-muted">Requests (today)</div>
-                  <div class="text-lg font-semibold">{fmt(s().today.requests)}</div>
+                  <div class="text-xl font-semibold text-text-main">{fmt(s().today.requests)}</div>
                   <div class="text-xs text-text-muted">{fmt(s().total.requests)} total</div>
-                </div>
-                <div class="rounded-lg border border-border bg-surface p-3">
+                </Card>
+                <Card padding="sm">
                   <div class="text-xs text-text-muted">Input tokens (today)</div>
-                  <div class="text-lg font-semibold">{fmt(s().today.input)}</div>
+                  <div class="text-xl font-semibold text-text-main">{fmt(s().today.input)}</div>
                   <div class="text-xs text-text-muted">{fmt(s().total.input)} total</div>
-                </div>
-                <div class="rounded-lg border border-border bg-surface p-3">
+                </Card>
+                <Card padding="sm">
                   <div class="text-xs text-text-muted">Output tokens (today)</div>
-                  <div class="text-lg font-semibold">{fmt(s().today.output)}</div>
+                  <div class="text-xl font-semibold text-text-main">{fmt(s().today.output)}</div>
                   <div class="text-xs text-text-muted">{fmt(s().total.output)} total</div>
-                </div>
-                <div class="rounded-lg border border-border bg-surface p-3">
+                </Card>
+                <Card padding="sm">
                   <div class="text-xs text-text-muted">RTK saved bytes</div>
-                  <div class="text-lg font-semibold">{fmt(s().rtk_saved_bytes)}</div>
+                  <div class="text-xl font-semibold text-text-main">{fmt(s().rtk_saved_bytes)}</div>
                   <div class="text-xs text-text-muted">compression savings, not provider-billed</div>
-                </div>
+                </Card>
               </div>
 
-              <section class="rounded-lg border border-border bg-surface p-4">
-                <h2 class="mb-3 text-sm font-medium">Tokens / day (30d)</h2>
+              <Card title="Tokens / day (30d)" icon="bar_chart">
                 <Show
                   when={(history()?.days.length ?? 0) > 0}
                   fallback={<p class="text-xs text-text-muted">No usage yet.</p>}
@@ -141,7 +138,7 @@ export default function UsagePage() {
                     <For each={history()?.days}>
                       {(d) => (
                         <div
-                          class="flex-1 rounded-t bg-accent/70"
+                          class="flex-1 rounded-t bg-brand-500/70"
                           style={{ height: `${Math.max(2, ((d.input + d.output) / maxTokens()) * 100)}%` }}
                           title={`${d.day}: ${fmt(d.input + d.output)} tokens (${fmt(d.requests)} req)`}
                         />
@@ -153,11 +150,10 @@ export default function UsagePage() {
                     <span>{history()?.days.at(-1)?.day}</span>
                   </div>
                 </Show>
-              </section>
+              </Card>
 
-              <div class="grid gap-3 md:grid-cols-2">
-                <section class="rounded-lg border border-border bg-surface p-4">
-                  <h2 class="mb-2 text-sm font-medium">By provider</h2>
+              <div class="grid gap-4 md:grid-cols-2">
+                <Card title="By provider" icon="dns">
                   <table class="w-full text-xs">
                     <thead>
                       <tr class="text-left text-text-muted">
@@ -171,21 +167,20 @@ export default function UsagePage() {
                     <tbody>
                       <For each={providers()?.providers}>
                         {(p) => (
-                          <tr class="border-t border-border">
-                            <td class="py-1 font-medium">{p.provider || "—"}</td>
+                          <tr class="border-t border-border-subtle">
+                            <td class="py-1.5 font-medium">{p.provider || "—"}</td>
                             <td>{fmt(p.requests)}</td>
                             <td>{fmt(p.input)}</td>
                             <td>{fmt(p.output)}</td>
-                            <td class={p.errors > 0 ? "text-red-400" : ""}>{fmt(p.errors)}</td>
+                            <td class={p.errors > 0 ? "text-danger" : ""}>{fmt(p.errors)}</td>
                           </tr>
                         )}
                       </For>
                     </tbody>
                   </table>
-                </section>
+                </Card>
 
-                <section class="rounded-lg border border-border bg-surface p-4">
-                  <h2 class="mb-2 text-sm font-medium">By model</h2>
+                <Card title="By model" icon="model_training">
                   <table class="w-full text-xs">
                     <thead>
                       <tr class="text-left text-text-muted">
@@ -198,8 +193,8 @@ export default function UsagePage() {
                     <tbody>
                       <For each={s().by_model}>
                         {(m) => (
-                          <tr class="border-t border-border">
-                            <td class="py-1 font-medium">{m.model || "—"}</td>
+                          <tr class="border-t border-border-subtle">
+                            <td class="py-1.5 font-medium">{m.model || "—"}</td>
                             <td>{fmt(m.requests)}</td>
                             <td>{fmt(m.input)}</td>
                             <td>{fmt(m.output)}</td>
@@ -208,7 +203,7 @@ export default function UsagePage() {
                       </For>
                     </tbody>
                   </table>
-                </section>
+                </Card>
               </div>
             </div>
           )}
@@ -227,21 +222,17 @@ export default function UsagePage() {
           <div class="space-y-1">
             <For each={logs()?.logs}>
               {(r) => (
-                <div class="rounded border border-border bg-surface text-xs">
+                <Card padding="none" class="text-xs">
                   <button
-                    class="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-bg"
+                    class="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2/50"
                     onClick={() => setOpen(open() === r.id ? null : r.id)}
                   >
                     <span class="text-text-muted">{r.ts.replace("T", " ").slice(0, 19)}</span>
                     <span class="font-medium">{r.provider}</span>
                     <span class="max-w-48 truncate">{r.model}</span>
-                    <span class={r.status === "error" ? "text-red-400" : "text-green-400"}>
-                      {r.status}
-                    </span>
+                    <Badge tone={r.status === "error" ? "red" : "green"}>{r.status}</Badge>
                     <Show when={r.data.pxpipe?.applied}>
-                      <span class="rounded bg-accent/20 px-1">
-                        PXPIPE -{r.data.pxpipe?.savedPct}%
-                      </span>
+                      <Badge tone="brand">PXPIPE -{r.data.pxpipe?.savedPct}%</Badge>
                     </Show>
                     <span class="ml-auto text-text-muted">
                       {fmt(r.data.input_tokens ?? 0)}→{fmt(r.data.output_tokens ?? 0)} tok
@@ -249,7 +240,7 @@ export default function UsagePage() {
                     </span>
                   </button>
                   <Show when={open() === r.id}>
-                    <div class="grid gap-2 border-t border-border p-3 md:grid-cols-2">
+                    <div class="grid gap-2 border-t border-border-subtle p-3 md:grid-cols-2">
                       <div>
                         <div class="mb-1 text-text-muted">Client request</div>
                         <pre class="max-h-64 overflow-auto rounded bg-bg p-2">
@@ -264,7 +255,7 @@ export default function UsagePage() {
                       </div>
                     </div>
                   </Show>
-                </div>
+                </Card>
               )}
             </For>
           </div>

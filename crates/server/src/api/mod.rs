@@ -1,5 +1,6 @@
 mod auth_routes;
 mod combos;
+mod import;
 mod keys;
 mod oauth;
 mod providers;
@@ -26,6 +27,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .nest("/settings", settings_routes::router())
         .nest("/combos", combos::router())
         .nest("/oauth", oauth::router())
+        .nest("/import", import::router())
         .nest("/usage", quota::router())
         .nest("/keys", keys::router())
         .nest("/providers", providers::router())

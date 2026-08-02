@@ -1,5 +1,6 @@
 import { Show, createResource, createSignal } from "solid-js";
 import { api } from "~/lib/api";
+import { Button, Card, Icon, Input, PageHeader, Select, Toggle } from "~/components/ui";
 
 interface Settings {
   rtk_enabled: boolean;
@@ -27,6 +28,7 @@ export default function SettingsPage() {
   const [settings, { refetch }] = createResource(async () => api<Settings>("/settings"));
   const [saving, setSaving] = createSignal(false);
   const [msg, setMsg] = createSignal("");
+  const [importMsg, setImportMsg] = createSignal("");
 
   const patch = async (body: Record<string, unknown>) => {
     setSaving(true);
@@ -64,112 +66,88 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1 class="mb-4 text-xl font-semibold">Settings</h1>
+      <PageHeader title="Settings" subtitle="Token savers, gateway policy, data import" />
       <Show when={settings()} fallback={<p class="text-sm text-text-muted">Loading…</p>}>
         {(s) => (
           <div class="max-w-xl space-y-6">
-            <section class="rounded-lg border border-border bg-surface p-4">
-              <h2 class="mb-3 font-medium">Token Savers</h2>
+            <Card title="Token Savers" icon="savings">
 
-              <label class="mb-3 flex items-center justify-between text-sm">
+              <div class="mb-3 flex items-center justify-between text-sm">
                 <span>
                   RTK compression
                   <span class="block text-xs text-text-muted">
                     Compress tool outputs (git diff, grep, ls, build logs…) before sending upstream
                   </span>
                 </span>
-                <input
-                  type="checkbox"
-                  checked={s().rtk_enabled}
-                  onChange={() => toggle("rtk_enabled")}
-                />
-              </label>
+                <Toggle checked={s().rtk_enabled} onChange={() => toggle("rtk_enabled")} />
+              </div>
 
-              <label class="mb-3 flex items-center justify-between text-sm">
+              <div class="mb-3 flex items-center justify-between text-sm">
                 <span>
                   Caveman
                   <span class="block text-xs text-text-muted">
                     Inject terse-response system prompt
                   </span>
                 </span>
-                <input
-                  type="checkbox"
-                  checked={s().caveman_enabled}
-                  onChange={() => toggle("caveman_enabled")}
-                />
-              </label>
+                <Toggle checked={s().caveman_enabled} onChange={() => toggle("caveman_enabled")} />
+              </div>
 
-              <label class="mb-3 flex items-center justify-between text-sm">
+              <div class="mb-3 flex items-center justify-between text-sm">
                 <span>
                   Ponytail
                   <span class="block text-xs text-text-muted">
                     Inject lazy-senior-dev system prompt (minimal code bias)
                   </span>
                 </span>
-                <input
-                  type="checkbox"
-                  checked={s().ponytail_enabled}
-                  onChange={() => toggle("ponytail_enabled")}
-                />
-              </label>
+                <Toggle checked={s().ponytail_enabled} onChange={() => toggle("ponytail_enabled")} />
+              </div>
 
-              <label class="flex items-center justify-between text-sm">
+              <div class="flex items-center justify-between text-sm">
                 <span>Ponytail level</span>
-                <select
-                  class="rounded border border-border bg-bg px-2 py-1 text-sm"
-                  value={s().ponytail_level}
-                  onChange={(e) => patch({ ponytail_level: e.currentTarget.value })}
-                >
+                <Select value={s().ponytail_level} onChange={(v) => patch({ ponytail_level: v })}>
                   <option value="lite">lite</option>
                   <option value="full">full</option>
                   <option value="ultra">ultra</option>
-                </select>
-              </label>
+                </Select>
+              </div>
 
-              <hr class="my-3 border-border" />
+              <hr class="my-4 border-border-subtle" />
 
-              <label class="mb-3 flex items-center justify-between text-sm">
+              <div class="mb-3 flex items-center justify-between text-sm">
                 <span>
                   PXPIPE
                   <span class="block text-xs text-text-muted">
-                    Render bulky Claude-format context as dense images (cheaper tokens). Requires
-                    pxpipe-proxy install + node/bun.
+                    Render bulky Claude-format context as dense images (cheaper tokens). Requires pxpipe-proxy install + node/bun.
                   </span>
                 </span>
-                <input
-                  type="checkbox"
-                  checked={s().pxpipe_enabled}
-                  onChange={() => toggle("pxpipe_enabled")}
-                />
-              </label>
+                <Toggle checked={s().pxpipe_enabled} onChange={() => toggle("pxpipe_enabled")} />
+              </div>
 
               <Show when={s().pxpipe_enabled}>
-                <label class="mb-3 flex items-center justify-between text-sm">
+                <div class="mb-3 flex items-center justify-between text-sm">
                   <span>Min chars (gate)</span>
-                  <input
-                    type="number"
-                    min="1000"
-                    step="1000"
-                    class="w-28 rounded border border-border bg-bg px-2 py-1 text-sm"
-                    value={s().pxpipe_min_chars}
-                    onChange={(e) =>
-                      patch({ pxpipe_min_chars: Number(e.currentTarget.value) || 25000 })
-                    }
-                  />
-                </label>
-                <label class="mb-3 flex items-center justify-between text-sm">
+                  <div class="w-28">
+                    <Input
+                      type="number"
+                      min="1000"
+                      step="1000"
+                      value={s().pxpipe_min_chars}
+                      onInput={(v) => patch({ pxpipe_min_chars: Number(v) || 25000 })}
+                    />
+                  </div>
+                </div>
+                <div class="mb-3 flex items-center justify-between text-sm">
                   <span>Timeout (ms)</span>
-                  <input
-                    type="number"
-                    min="1000"
-                    step="1000"
-                    class="w-28 rounded border border-border bg-bg px-2 py-1 text-sm"
-                    value={s().pxpipe_timeout_ms}
-                    onChange={(e) =>
-                      patch({ pxpipe_timeout_ms: Number(e.currentTarget.value) || 15000 })
-                    }
-                  />
-                </label>
+                  <div class="w-28">
+                    <Input
+                      type="number"
+                      min="1000"
+                      step="1000"
+                      value={s().pxpipe_timeout_ms}
+                      onInput={(v) => patch({ pxpipe_timeout_ms: Number(v) || 15000 })}
+                    />
+                  </div>
+                </div>
                 <div class="flex items-center justify-between text-sm">
                   <span class="text-xs text-text-muted">
                     {pxpipe()?.installed
@@ -181,12 +159,9 @@ export default function SettingsPage() {
                           : "no JS runtime (node/bun) found"}
                   </span>
                   <Show when={!pxpipe()?.installed && !pxpipe()?.installing}>
-                    <button
-                      class="rounded border border-border px-2 py-1 text-xs hover:bg-bg"
-                      onClick={installPxpipe}
-                    >
+                    <Button variant="secondary" size="sm" icon="download" onClick={installPxpipe}>
                       Install pxpipe-proxy
-                    </button>
+                    </Button>
                   </Show>
                 </div>
               </Show>
@@ -195,50 +170,82 @@ export default function SettingsPage() {
                 Per-request bypass: header <code>x-9router-token-saver: off</code>. Savings are
                 recorded per request (usage meta <code>rtk_saved_bytes</code>).
               </p>
-            </section>
+            </Card>
 
-            <section class="rounded-lg border border-border bg-surface p-4">
-              <h2 class="mb-3 font-medium">Gateway</h2>
-              <label class="mb-3 flex items-center justify-between text-sm">
+            <Card title="Gateway" icon="lan">
+              <div class="mb-3 flex items-center justify-between text-sm">
                 <span>Require API key on /v1</span>
-                <input
-                  type="checkbox"
-                  checked={s().require_api_key}
-                  onChange={() => toggle("require_api_key")}
-                />
-              </label>
-              <label class="mb-3 flex items-center justify-between text-sm">
+                <Toggle checked={s().require_api_key} onChange={() => toggle("require_api_key")} />
+              </div>
+              <div class="mb-3 flex items-center justify-between text-sm">
                 <span>Require dashboard login</span>
-                <input
-                  type="checkbox"
-                  checked={s().require_login}
-                  onChange={() => toggle("require_login")}
-                />
-              </label>
-              <label class="mb-3 flex items-center justify-between text-sm">
+                <Toggle checked={s().require_login} onChange={() => toggle("require_login")} />
+              </div>
+              <div class="mb-3 flex items-center justify-between text-sm">
                 <span>Request logs</span>
-                <input
-                  type="checkbox"
-                  checked={s().enable_request_logs}
-                  onChange={() => toggle("enable_request_logs")}
-                />
-              </label>
-              <label class="flex items-center justify-between text-sm">
+                <Toggle checked={s().enable_request_logs} onChange={() => toggle("enable_request_logs")} />
+              </div>
+              <div class="flex items-center justify-between text-sm">
                 <span>Sticky round-robin limit</span>
-                <input
-                  type="number"
-                  min="1"
-                  class="w-20 rounded border border-border bg-bg px-2 py-1 text-sm"
-                  value={s().sticky_round_robin_limit}
-                  onChange={(e) =>
-                    patch({ sticky_round_robin_limit: Number(e.currentTarget.value) || 3 })
-                  }
-                />
-              </label>
-            </section>
+                <div class="w-20">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={s().sticky_round_robin_limit}
+                    onInput={(v) => patch({ sticky_round_robin_limit: Number(v) || 3 })}
+                  />
+                </div>
+              </div>
+            </Card>
 
-            <div class="text-sm text-text-muted">
-              <Show when={saving()}>saving…</Show>
+            <Card title="Import from 9router" icon="upload">
+
+              <p class="mb-3 text-xs text-text-muted">
+                Upload a 9router database export (Settings → Database → Export on your 9router
+                instance). Connections, API keys, combos and matching settings are merged —
+                existing data is kept, conflicts replaced by id.
+              </p>
+              <input
+                type="file"
+                accept="application/json"
+                class="text-xs"
+                onChange={async (e) => {
+                  const file = e.currentTarget.files?.[0];
+                  if (!file) return;
+                  setImportMsg("");
+                  try {
+                    const payload = JSON.parse(await file.text());
+                    const r = await api<{
+                      connections: number;
+                      apiKeys: number;
+                      combos: number;
+                      settingsApplied: string[];
+                      skipped: string[];
+                    }>("/import/9router", { method: "POST", body: JSON.stringify(payload) });
+                    setImportMsg(
+                      `imported: ${r.connections} connections, ${r.apiKeys} keys, ${r.combos} combos` +
+                        (r.settingsApplied.length
+                          ? ` · settings: ${r.settingsApplied.join(", ")}`
+                          : "") +
+                        (r.skipped.length ? ` · skipped: ${r.skipped.join(", ")}` : "")
+                    );
+                    await refetch();
+                  } catch (err) {
+                    setImportMsg(err instanceof Error ? err.message : "import failed");
+                  } finally {
+                    e.currentTarget.value = "";
+                  }
+                }}
+              />
+              <Show when={importMsg()}>
+                <p class="mt-2 text-xs text-text-muted">{importMsg()}</p>
+              </Show>
+            </Card>
+
+            <div class="flex items-center gap-1.5 text-sm text-text-muted">
+              <Show when={saving()}>
+                <Icon name="progress_activity" class="animate-spin text-[16px]" />
+              </Show>
               {msg()}
             </div>
           </div>

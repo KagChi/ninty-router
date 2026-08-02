@@ -51,6 +51,9 @@ async fn list_providers(
                 },
                 "display_name": p.display_name,
                 "notice_url": p.notice_url,
+                "color": p.color,
+                "text_icon": p.text_icon,
+                "no_auth": p.no_auth,
                 "models": p.models.iter().map(|m| json!({
                     "id": m.id,
                     "name": m.name,

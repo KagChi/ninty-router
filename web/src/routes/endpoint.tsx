@@ -1,5 +1,6 @@
 import { For, Show, createResource, createSignal } from "solid-js";
 import { api, type ApiKey } from "~/lib/api";
+import { Button, Card, CardSection, Icon, Input, PageHeader } from "~/components/ui";
 
 export default function Endpoint() {
   const [keys, { refetch }] = createResource(async () => {
@@ -46,84 +47,86 @@ export default function Endpoint() {
   };
 
   return (
-    <div>
-      <h1 class="mb-6 text-xl font-semibold">Endpoint & API Keys</h1>
+    <div class="flex flex-col gap-6">
+      <PageHeader
+        title="Endpoint & API Keys"
+        subtitle="Point your CLI tools at this router — one URL for every provider"
+      />
 
-      <section class="mb-6 rounded-lg border border-border bg-surface p-4">
-        <div class="mb-1 text-sm text-text-muted">Base URL (use in your CLI tools)</div>
+      <Card title="Base URL" icon="link">
         <div class="flex items-center gap-2">
-          <code class="rounded bg-bg px-3 py-2 text-sm text-primary">{baseUrl()}</code>
-          <button
-            class="rounded-md border border-border px-3 py-1.5 text-sm text-text-muted hover:text-text"
+          <code class="rounded-[10px] bg-bg px-3 py-2 font-mono text-sm text-brand-500">
+            {baseUrl()}
+          </code>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={copied() === "url" ? "check" : "content_copy"}
             onClick={() => copy(baseUrl(), "url")}
           >
             {copied() === "url" ? "copied" : "copy"}
-          </button>
+          </Button>
         </div>
-        <p class="mt-2 text-xs text-text-muted">
-          Auth: <code>Authorization: Bearer &lt;key&gt;</code> — point Claude Code, Cursor,
-          Cline, Codex… at this URL.
+        <p class="mt-3 text-xs text-text-muted">
+          Auth: <code class="font-mono">Authorization: Bearer &lt;key&gt;</code> — Claude Code,
+          Cursor, Cline, Codex… all point here. Anthropic-native tools use{" "}
+          <code class="font-mono">/v1/messages</code>, Gemini tools{" "}
+          <code class="font-mono">/v1beta</code>.
         </p>
-      </section>
+      </Card>
 
-      <section class="rounded-lg border border-border bg-surface p-4">
-        <div class="mb-4 flex items-center justify-between">
-          <h2 class="font-medium">API Keys</h2>
-          <button
-            class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white"
-            onClick={() => setShowCreate(true)}
-          >
-            + New key
-          </button>
-        </div>
-
+      <Card
+        title="API Keys"
+        icon="key"
+        action={
+          <Button size="sm" icon="add" onClick={() => setShowCreate(true)}>
+            New key
+          </Button>
+        }
+      >
         <Show when={showCreate()}>
-          <form
-            onSubmit={createKey}
-            class="mb-4 flex items-end gap-2 rounded-md border border-border bg-bg p-3"
-          >
-            <label class="flex-1 text-xs text-text-muted">
-              Name
-              <input
-                class="mt-1 w-full rounded border border-border bg-surface px-2 py-1.5 text-sm text-text"
-                value={name()}
-                onInput={(e) => setName(e.currentTarget.value)}
-                placeholder="my-key"
-              />
-            </label>
-            <label class="w-32 text-xs text-text-muted">
-              RPM limit
-              <input
-                type="number"
-                class="mt-1 w-full rounded border border-border bg-surface px-2 py-1.5 text-sm text-text"
-                value={rpm()}
-                onInput={(e) => setRpm(e.currentTarget.value)}
-                placeholder="∞"
-              />
-            </label>
-            <button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-sm text-white">
-              Create
-            </button>
-            <button
-              type="button"
-              class="rounded-md border border-border px-3 py-1.5 text-sm text-text-muted"
-              onClick={() => setShowCreate(false)}
-            >
-              Cancel
-            </button>
-          </form>
+          <CardSection class="mb-4">
+            <form onSubmit={createKey} class="flex items-end gap-2">
+              <label class="flex-1 text-xs font-medium text-text-muted">
+                Name
+                <div class="mt-1">
+                  <Input value={name()} onInput={setName} placeholder="my-key" />
+                </div>
+              </label>
+              <label class="w-32 text-xs font-medium text-text-muted">
+                RPM limit
+                <div class="mt-1">
+                  <Input type="number" value={rpm()} onInput={setRpm} placeholder="∞" />
+                </div>
+              </label>
+              <Button type="submit" size="sm">
+                Create
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
+            </form>
+          </CardSection>
         </Show>
 
-        {error() && <p class="mb-2 text-sm text-danger">{error()}</p>}
+        <Show when={error()}>
+          <p class="mb-3 flex items-center gap-1.5 text-sm text-danger">
+            <Icon name="error" class="text-[16px]" /> {error()}
+          </p>
+        </Show>
 
         <Show when={keys()} fallback={<p class="text-sm text-text-muted">loading…</p>}>
           <Show
             when={(keys()?.length ?? 0) > 0}
-            fallback={<p class="text-sm text-text-muted">No keys yet.</p>}
+            fallback={
+              <p class="py-4 text-center text-sm text-text-muted">
+                No keys yet — any bearer token works while “Require API key” is off.
+              </p>
+            }
           >
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-border text-left text-xs text-text-muted">
+                <tr class="border-b border-border-subtle text-left text-xs font-semibold text-text-muted">
                   <th class="py-2 pr-4">Name</th>
                   <th class="py-2 pr-4">Key</th>
                   <th class="py-2 pr-4">RPM</th>
@@ -134,28 +137,23 @@ export default function Endpoint() {
               <tbody>
                 <For each={keys()}>
                   {(k) => (
-                    <tr class="border-b border-border/50">
-                      <td class="py-2 pr-4">{k.name ?? "—"}</td>
-                      <td class="py-2 pr-4">
+                    <tr class="border-b border-border-subtle last:border-b-0">
+                      <td class="py-2.5 pr-4 font-medium">{k.name ?? "—"}</td>
+                      <td class="py-2.5 pr-4">
                         <button
-                          class="text-primary hover:underline"
+                          class="font-mono text-xs text-brand-500 hover:underline"
                           title="click to copy"
                           onClick={() => copy(k.key, k.id)}
                         >
-                          {copied() === k.id ? "copied" : `${k.key.slice(0, 12)}…`}
+                          {copied() === k.id ? "✓ copied" : `${k.key.slice(0, 12)}…`}
                         </button>
                       </td>
-                      <td class="py-2 pr-4">{k.rpm_limit ?? "∞"}</td>
-                      <td class="py-2 pr-4 text-text-muted">
+                      <td class="py-2.5 pr-4">{k.rpm_limit ?? "∞"}</td>
+                      <td class="py-2.5 pr-4 text-text-muted">
                         {new Date(k.created_at).toLocaleDateString()}
                       </td>
-                      <td class="py-2 text-right">
-                        <button
-                          class="text-danger hover:underline"
-                          onClick={() => remove(k.id)}
-                        >
-                          delete
-                        </button>
+                      <td class="py-2.5 text-right">
+                        <Button variant="ghost" size="sm" icon="delete" onClick={() => remove(k.id)} />
                       </td>
                     </tr>
                   )}
@@ -164,7 +162,7 @@ export default function Endpoint() {
             </table>
           </Show>
         </Show>
-      </section>
+      </Card>
     </div>
   );
 }

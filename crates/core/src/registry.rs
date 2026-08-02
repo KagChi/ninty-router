@@ -70,6 +70,9 @@ pub struct ProviderDef {
     pub category: Category,
     pub display_name: &'static str,
     pub notice_url: Option<&'static str>,
+    /// Brand color (9router registry 1:1) + 2-letter fallback glyph.
+    pub color: &'static str,
+    pub text_icon: &'static str,
     pub transport: Transport,
     /// Alternate transports picked when one matches the client's wire format
     /// (zero-translation fast path). First match wins.
@@ -129,6 +132,8 @@ pub static PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "Anthropic",
         notice_url: Some("https://console.anthropic.com/settings/keys"),
+        color: "#D97757",
+        text_icon: "AN",
         transport: Transport {
             headers: &[("anthropic-version", "2023-06-01")],
             format: WireFormat::Claude,
@@ -150,6 +155,8 @@ pub static PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "OpenRouter",
         notice_url: Some("https://openrouter.ai/keys"),
+        color: "#F97316",
+        text_icon: "OR",
         transport: Transport {
             headers: &[
                 ("HTTP-Referer", "https://ninty-router.local"),
@@ -174,6 +181,8 @@ pub static PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "DeepSeek",
         notice_url: Some("https://platform.deepseek.com/api_keys"),
+        color: "#4D6BFE",
+        text_icon: "DS",
         transport: t("https://api.deepseek.com/chat/completions"),
         alt_transports: &[],
         no_auth: false,
@@ -189,6 +198,8 @@ pub static PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "Groq",
         notice_url: Some("https://console.groq.com/keys"),
+        color: "#F55036",
+        text_icon: "GQ",
         transport: t("https://api.groq.com/openai/v1/chat/completions"),
         alt_transports: &[],
         no_auth: false,
@@ -204,6 +215,8 @@ pub static PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "Mistral",
         notice_url: Some("https://console.mistral.ai/api-keys"),
+        color: "#FF7000",
+        text_icon: "MI",
         transport: t("https://api.mistral.ai/v1/chat/completions"),
         alt_transports: &[],
         no_auth: false,
@@ -219,6 +232,8 @@ pub static PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "xAI",
         notice_url: Some("https://console.x.ai/"),
+        color: "#1DA1F2",
+        text_icon: "XA",
         transport: t("https://api.x.ai/v1/chat/completions"),
         alt_transports: &[],
         no_auth: false,
@@ -234,6 +249,8 @@ pub static PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "Together AI",
         notice_url: Some("https://api.together.xyz/settings/api-keys"),
+        color: "#0F6FFF",
+        text_icon: "TG",
         transport: t("https://api.together.xyz/v1/chat/completions"),
         alt_transports: &[],
         no_auth: false,
@@ -252,6 +269,8 @@ pub static PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "Blackbox AI",
         notice_url: Some("https://www.blackbox.ai/api-management"),
+        color: "#5B5FEF",
+        text_icon: "BB",
         transport: t("https://api.blackbox.ai/v1/chat/completions"),
         alt_transports: &[],
         no_auth: false,
@@ -320,6 +339,8 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         category: Category::OAuth,
         display_name: "Claude Code (OAuth)",
         notice_url: Some("https://claude.ai/settings"),
+        color: "#D97757",
+        text_icon: "CC",
         transport: Transport {
             headers: &[
                 ("anthropic-version", "2023-06-01"),
@@ -351,6 +372,8 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         category: Category::OAuth,
         display_name: "OpenAI Codex (OAuth)",
         notice_url: Some("https://chatgpt.com/codex"),
+        color: "#3B82F6",
+        text_icon: "CX",
         transport: Transport {
             headers: &[
                 ("originator", "codex_cli_rs"),
@@ -379,6 +402,8 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         category: Category::OAuth,
         display_name: "GitHub Copilot (OAuth)",
         notice_url: Some("https://github.com/features/copilot"),
+        color: "#333333",
+        text_icon: "GH",
         transport: Transport {
             headers: &[
                 ("copilot-integration-id", "vscode-chat"),
@@ -413,6 +438,8 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         category: Category::OAuth,
         display_name: "Cline",
         notice_url: Some("https://cline.bot"),
+        color: "#5B9BD5",
+        text_icon: "CL",
         transport: Transport {
             headers: &[("http-referer", "https://cline.bot"), ("x-title", "Cline")],
             ..t("https://api.cline.bot/api/v1/chat/completions")
@@ -439,6 +466,8 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         category: Category::OAuth,
         display_name: "CodeBuddy CN",
         notice_url: Some("https://copilot.tencent.com"),
+        color: "#006EFF",
+        text_icon: "CB",
         transport: Transport {
             headers: &[
                 ("user-agent", "CLI/2.108.1 CodeBuddy/2.108.1"),
@@ -477,6 +506,8 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         category: Category::OAuth,
         display_name: "CodeBuddy",
         notice_url: Some("https://www.codebuddy.ai/profile/keys"),
+        color: "#006EFF",
+        text_icon: "CB",
         transport: Transport {
             headers: &[
                 ("user-agent", "IDE/2.108.1 CodeBuddy/2.108.1"),
@@ -518,6 +549,8 @@ pub static OAUTH_PROVIDERS: &[ProviderDef] = &[
         category: Category::OAuth,
         display_name: "Qoder",
         notice_url: Some("https://qoder.com/account/integrations"),
+        color: "#EC4899",
+        text_icon: "QD",
         transport: Transport {
             // custom executor path (COSY-signed, envelope SSE); base unused
             force_stream: true,
@@ -549,6 +582,8 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "Google Gemini",
         notice_url: Some("https://aistudio.google.com/apikey"),
+        color: "#4285F4",
+        text_icon: "GE",
         transport: Transport {
             format: WireFormat::Gemini,
             auth: AuthStyle::QueryKey,
@@ -569,6 +604,8 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "GLM (z.ai)",
         notice_url: Some("https://z.ai/manage-apikey/apikey-list"),
+        color: "#2563EB",
+        text_icon: "GL",
         transport: Transport {
             headers: CLAUDE_API_HEADERS,
             ..tc("https://api.z.ai/api/anthropic/v1/messages")
@@ -589,6 +626,8 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "GLM CN (bigmodel)",
         notice_url: Some("https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys"),
+        color: "#2563EB",
+        text_icon: "GL",
         transport: t("https://open.bigmodel.cn/api/coding/paas/v4/chat/completions"),
         alt_transports: &[],
         no_auth: false,
@@ -607,6 +646,8 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "MiniMax",
         notice_url: Some("https://platform.minimax.io/user-center/basic-information/interface-key"),
+        color: "#7C3AED",
+        text_icon: "MM",
         transport: Transport {
             headers: CLAUDE_API_HEADERS,
             ..tc("https://api.minimax.io/anthropic/v1/messages")
@@ -626,6 +667,8 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "MiniMax CN",
         notice_url: Some("https://www.minimaxi.com/user-center/basic-information/interface-key"),
+        color: "#7C3AED",
+        text_icon: "MM",
         transport: Transport {
             headers: CLAUDE_API_HEADERS,
             ..tc("https://api.minimaxi.com/anthropic/v1/messages")
@@ -645,6 +688,8 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         category: Category::ApiKey,
         display_name: "Kimi (Moonshot)",
         notice_url: Some("https://platform.moonshot.ai/console/api-keys"),
+        color: "#1E3A8A",
+        text_icon: "KM",
         transport: Transport {
             headers: CLAUDE_API_HEADERS,
             ..tc("https://api.kimi.com/coding/v1/messages")
@@ -665,6 +710,8 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         category: Category::Free,
         display_name: "OpenCode Free",
         notice_url: Some("https://opencode.ai"),
+        color: "#E87040",
+        text_icon: "OC",
         transport: Transport {
             headers: &[("x-opencode-client", "desktop")],
             auth: AuthStyle::PublicToken,
@@ -680,6 +727,8 @@ pub static EXTRA_PROVIDERS: &[ProviderDef] = &[
         category: Category::Free,
         display_name: "Vertex AI",
         notice_url: Some("https://console.cloud.google.com/"),
+        color: "#4285F4",
+        text_icon: "VX",
         transport: Transport {
             format: WireFormat::Gemini,
             auth: AuthStyle::Bearer,

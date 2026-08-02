@@ -1,5 +1,6 @@
 import { For, Show, createResource, createSignal, onCleanup, onMount } from "solid-js";
 import { api } from "~/lib/api";
+import { Badge, Button, Card, Icon, PageHeader } from "~/components/ui";
 
 interface QuotaWindow {
   label: string;
@@ -31,7 +32,7 @@ function countdown(resetAt: string | null, now: number): string {
 function barClass(used: number): string {
   if (used >= 90) return "bg-red-500";
   if (used >= 70) return "bg-amber-500";
-  return "bg-primary";
+  return "bg-brand-500";
 }
 
 export default function QuotaPage() {
@@ -48,15 +49,15 @@ export default function QuotaPage() {
 
   return (
     <div>
-      <div class="mb-4 flex items-center justify-between">
-        <h1 class="text-xl font-semibold">Quota</h1>
-        <button
-          class="rounded border border-border px-3 py-1 text-sm text-text-muted hover:text-text"
-          onClick={() => refetch()}
-        >
-          refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Quota Tracker"
+        subtitle="Remaining quota on OAuth providers, with reset countdowns"
+        actions={
+          <Button variant="secondary" size="sm" icon="refresh" onClick={() => refetch()}>
+            refresh
+          </Button>
+        }
+      />
 
       <Show when={reports()} fallback={<p class="text-sm text-text-muted">Loading…</p>}>
         <Show
@@ -68,17 +69,17 @@ export default function QuotaPage() {
             </p>
           }
         >
-          <div class="grid gap-3 md:grid-cols-2">
+          <div class="grid gap-4 md:grid-cols-2">
             <For each={reports()!.reports}>
               {(r) => (
-                <div class="rounded-lg border border-border bg-surface p-4">
+                <Card padding="sm">
                   <div class="mb-2 flex items-center justify-between">
-                    <span class="font-medium">{r.provider}</span>
+                    <span class="font-semibold capitalize text-text-main">{r.provider}</span>
                     <Show when={r.plan}>
-                      <span class="rounded bg-bg px-1.5 py-0.5 text-xs text-text-muted">{r.plan}</span>
+                      <Badge tone="neutral">{r.plan}</Badge>
                     </Show>
                   </div>
-                  <Show when={!r.error} fallback={<p class="text-sm text-red-400">{r.error}</p>}>
+                  <Show when={!r.error} fallback={<p class="flex items-center gap-1.5 text-sm text-danger"><Icon name="error" class="text-[16px]" /> {r.error}</p>}>
                     <For each={r.windows}>
                       {(w) => (
                         <div class="mb-3">
@@ -105,7 +106,7 @@ export default function QuotaPage() {
                       fetched {new Date(r.fetched_at).toLocaleTimeString()}
                     </p>
                   </Show>
-                </div>
+                </Card>
               )}
             </For>
           </div>
