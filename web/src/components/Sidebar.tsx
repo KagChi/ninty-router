@@ -65,9 +65,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div class="flex flex-col gap-2 px-6 py-4">
         <A href="/" class="flex items-center gap-3 no-underline">
-          <div class="flex size-9 items-center justify-center rounded-[10px] bg-gradient-to-br from-brand-500 to-brand-700 shadow-[var(--shadow-warm)]">
-            <Icon name="hub" class="text-[20px] text-white" />
-          </div>
+          <img src="/logo.svg" alt="ninty-router" width="36" height="36" class="rounded-[10px] shadow-[var(--shadow-warm)]" />
           <div class="flex flex-col">
             <h1 class="text-lg font-semibold tracking-tight text-text-main">ninty-router</h1>
             <span class="text-xs text-text-muted">local ai router</span>

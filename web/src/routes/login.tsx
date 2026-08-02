@@ -30,9 +30,7 @@ export default function Login() {
     <div class="flex min-h-screen items-center justify-center bg-bg p-4">
       <form onSubmit={submit} class="card-elev w-80 border border-border p-8">
         <div class="mb-6 flex items-center gap-3">
-          <div class="flex size-9 items-center justify-center rounded-[10px] bg-gradient-to-br from-brand-500 to-brand-700 shadow-[var(--shadow-warm)]">
-            <Icon name="hub" class="text-[20px] text-white" />
-          </div>
+          <img src="/logo.svg" alt="ninty-router" width="36" height="36" class="rounded-[10px] shadow-[var(--shadow-warm)]" />
           <div>
             <h1 class="text-lg font-semibold tracking-tight text-text-main">ninty-router</h1>
             <p class="text-xs text-text-muted">Dashboard login</p>
