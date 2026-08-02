@@ -91,7 +91,7 @@ export default function SettingsPage() {
       <PageHeader title="Settings" subtitle="Token savers, gateway policy, data import" />
       <Show when={settings()} fallback={<CardSkeleton />}>
         {(s) => (
-          <div class="max-w-xl space-y-6">
+          <div class="space-y-6">
             <Card title="Token Savers" icon="savings">
 
               <div class="mb-3 flex items-center justify-between text-sm">
