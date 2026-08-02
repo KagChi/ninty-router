@@ -159,5 +159,7 @@ live e2e against running server where credentials/mocks allow.
 - 2026-08-02: **P3 DONE** (42c64cf) — models APIs (alias/disabled/custom/test),
   capabilities globs, detail page Models card + Connections card 1:1 (priority
   arrows, RR toggle + sticky via provider_strategies, import/export endpoints,
-  Test 1 by 1, bulk select ops). Skipped: P3d banners/anthropic-compatible —
-  not present in ninty registry, out of scope.
+  Test 1 by 1, bulk select ops).
+- 2026-08-02: **P3d DONE** (5d5d3c0) — deprecated flag + RISK_NOTICE banner
+  (claude/codex/github), Add Anthropic/OpenAI Compatible buttons + apiType badge.
+  Skipped: compatible-node detail page (nodes managed inline on index).
